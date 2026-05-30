@@ -23,6 +23,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -37,6 +38,7 @@ public class GuiTerminal extends GuiScreen {
     private static final int CONTENT_TOP = 50;
     private static final int DETAIL_WIDTH = 134;
     private static final int LIST_ROW_WIDTH = LIST_WIDTH - 8;
+    private static final Method JEC_CONTAINS = findJecContains();
 
     private GuiTextField searchField;
     private MachineKey selected;
@@ -401,7 +403,7 @@ public class GuiTerminal extends GuiScreen {
         String query = searchField == null ? "" : searchField.getText().toLowerCase(Locale.ROOT).trim();
         List<MachineInfo> machines = new ArrayList<>();
         for (MachineInfo machine : ClientTerminalData.getMachines()) {
-            if (query.isEmpty() || machine.name.toLowerCase(Locale.ROOT).contains(query)) {
+            if (matchesSearch(machine, query)) {
                 machines.add(machine);
             }
         }
@@ -411,6 +413,40 @@ public class GuiTerminal extends GuiScreen {
         }
         machines.sort(comparator.thenComparing(machine -> machine.name));
         return machines;
+    }
+
+    private boolean matchesSearch(MachineInfo machine, String query) {
+        if (query.isEmpty()) {
+            return true;
+        }
+
+        String name = machine.name.toLowerCase(Locale.ROOT);
+        for (String part : query.split("\\s+")) {
+            if (!name.contains(part) && !jecContains(name, part)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Method findJecContains() {
+        try {
+            return Class.forName("me.towdium.jecharacters.util.Match")
+                    .getMethod("contains", String.class, CharSequence.class);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static boolean jecContains(String text, String query) {
+        if (JEC_CONTAINS == null) {
+            return false;
+        }
+        try {
+            return (Boolean) JEC_CONTAINS.invoke(null, text, query);
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private MachineInfo selectedMachine() {
