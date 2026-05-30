@@ -216,7 +216,7 @@ public class GuiTerminal extends GuiScreen {
             boolean isSelected = selected != null && selected.equals(machine.key);
             int bg = isSelected ? 0xFF314B5A : 0xFF22272D;
             drawRect(listX, y, listX + LIST_ROW_WIDTH, y + ROW_HEIGHT - 2, bg);
-            drawStatusLamp(listX + 4, y + 5, machine);
+            drawStatusLamp(listX + 4, y + 4, machine);
             drawItem(machine.controllerIcon, listX + 12, y + 3, !machine.loaded);
             int textColor = machine.loaded ? 0xFFE2E7EA : 0xFF888888;
             fontRenderer.drawString(trim(machine.name, 82), listX + 34, y + 1, textColor);
@@ -240,10 +240,10 @@ public class GuiTerminal extends GuiScreen {
             return;
         }
 
-        drawItem(machine.controllerIcon, x, y, !machine.loaded);
-        fontRenderer.drawString(trim(machine.name, 118), x + 20, y + 1, machine.loaded ? 0xFFE2E7EA : 0xFF888888);
+        drawItem(machine.controllerIcon, x, y + 1, !machine.loaded);
+        fontRenderer.drawString(trim(machine.name, 118), x + 24, y + 2, machine.loaded ? 0xFFE2E7EA : 0xFF888888);
         BlockPos pos = machine.key.pos;
-        fontRenderer.drawString("D" + machine.key.dimension + " " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(), x + 20, y + 12, 0xFF9EA8B2);
+        fontRenderer.drawString("D" + machine.key.dimension + " " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(), x + 24, y + 13, 0xFF9EA8B2);
         y += 26;
 
         if (!machine.loaded) {
