@@ -31,7 +31,7 @@ import java.util.Locale;
 public class GuiTerminal extends GuiScreen {
 
     private static final int GUI_WIDTH = 292;
-    private static final int GUI_HEIGHT = 190;
+    private static final int GUI_HEIGHT = 212;
     private static final int LIST_WIDTH = 126;
     private static final int ROW_HEIGHT = 24;
     private static final int CONTENT_TOP = 50;
@@ -43,6 +43,7 @@ public class GuiTerminal extends GuiScreen {
     private SortMode sortMode = SortMode.NAME;
     private boolean descending;
     private int scroll;
+    private int threadScroll;
 
     @Override
     public void initGui() {
@@ -106,13 +107,14 @@ public class GuiTerminal extends GuiScreen {
         }
 
         int listX = left + 10;
-        int listY = top + CONTENT_TOP + 2;
+        int listY = top + CONTENT_TOP + 6;
         List<MachineInfo> visible = visibleMachines();
         int rows = Math.min(visibleRowCount(), visible.size() - scroll);
         for (int i = 0; i < rows; i++) {
             int y = listY + i * ROW_HEIGHT;
             if (inside(mouseX, mouseY, listX, y, LIST_ROW_WIDTH, ROW_HEIGHT - 2)) {
                 selected = visible.get(scroll + i).key;
+                threadScroll = 0;
                 TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys()));
             }
         }
@@ -141,6 +143,18 @@ public class GuiTerminal extends GuiScreen {
             if (scroll > maxScroll) {
                 scroll = maxScroll;
             }
+        } else if (wheel != 0 && overDetailPanel()) {
+            MachineInfo machine = selectedMachine();
+            if (machine != null) {
+                int maxScroll = Math.max(0, machine.threads.size() - visibleThreadRows(threadStartY()));
+                threadScroll += wheel < 0 ? 1 : -1;
+                if (threadScroll < 0) {
+                    threadScroll = 0;
+                }
+                if (threadScroll > maxScroll) {
+                    threadScroll = maxScroll;
+                }
+            }
         }
     }
 
@@ -153,7 +167,7 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private void drawHeader(int left, int top) {
-        fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.title"), left + 8, top + 8, 0xDDEEFF);
+        fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.title"), left + 8, top + 7, 0xDDEEFF);
         SummaryInfo summary = ClientTerminalData.getSummary();
         int y = top + 18;
         drawStat(left + 8, y, "gui.modular_machinery_terminal.total", summary.total, 0xFFBFC7CF);
@@ -196,7 +210,7 @@ public class GuiTerminal extends GuiScreen {
     private void drawMachineList(int left, int top, int mouseX, int mouseY) {
         List<MachineInfo> visible = visibleMachines();
         int listX = left + 10;
-        int listY = top + CONTENT_TOP + 2;
+        int listY = top + CONTENT_TOP + 6;
         int rows = Math.min(visibleRowCount(), visible.size() - scroll);
         for (int i = 0; i < rows; i++) {
             MachineInfo machine = visible.get(scroll + i);
@@ -212,12 +226,13 @@ public class GuiTerminal extends GuiScreen {
             String coord = "Dim" + machine.key.dimension + " " + pos.getX() + "," + pos.getY() + "," + pos.getZ();
             fontRenderer.drawString(trim(coord, 82), listX + 34, y + 11, machine.loaded ? 0xFF9EA8B2 : 0xFF777777);
         }
+        drawScrollbar(left + LIST_WIDTH + 8, listY, 3, visibleRowCount() * ROW_HEIGHT - 2, visible.size(), visibleRowCount(), scroll);
     }
 
     private void drawDetails(int left, int top, int mouseX, int mouseY) {
         MachineInfo machine = selectedMachine();
-        int x = left + LIST_WIDTH + 18;
-        int y = top + 52;
+        int x = left + LIST_WIDTH + 20;
+        int y = top + 55;
         if (machine == null) {
             fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.no_machine"), x, y, 0xFF9EA8B2);
             return;
@@ -243,7 +258,7 @@ public class GuiTerminal extends GuiScreen {
         fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.parallelism") + ": " + machine.parallelism + "/" + machine.maxParallelism, x, y, 0xFFD8DEE5);
         y += 13;
 
-        drawThreads(x, y, machine, mouseX, mouseY);
+        drawThreads(x, y + 1, machine, mouseX, mouseY);
     }
 
     private void drawThreads(int x, int y, MachineInfo machine, int mouseX, int mouseY) {
@@ -252,28 +267,55 @@ public class GuiTerminal extends GuiScreen {
             return;
         }
 
-        for (int i = 0; i < machine.threads.size(); i++) {
-            ThreadInfo thread = machine.threads.get(i);
+        String tooltip = null;
+        int rows = Math.min(machine.threads.size(), visibleThreadRows(y));
+        int maxScroll = Math.max(0, machine.threads.size() - rows);
+        if (threadScroll > maxScroll) {
+            threadScroll = maxScroll;
+        }
+        for (int i = 0; i < rows; i++) {
+            ThreadInfo thread = machine.threads.get(threadScroll + i);
             int rowY = y + i * ROW_HEIGHT;
-            drawRect(x, rowY, x + DETAIL_WIDTH, rowY + ROW_HEIGHT - 2, 0xFF22272D);
+            drawRect(x, rowY, x + DETAIL_WIDTH - 2, rowY + ROW_HEIGHT - 2, 0xFF22272D);
             drawThreadStatusLamp(x + 4, rowY + 4, thread);
             drawOutputIcon(thread.output, x + 12, rowY + 3);
-            fontRenderer.drawString(trim(thread.name, 60), x + 34, rowY + 1, thread.working ? 0xFFE2E7EA : 0xFFBFC7CF);
+            fontRenderer.drawString(trim(thread.name, 58), x + 34, rowY + 1, thread.working ? 0xFFE2E7EA : 0xFFBFC7CF);
             fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.parallelism") + ": " + thread.parallelism, x + 34, rowY + 11, 0xFF9EA8B2);
             String progress = thread.progress + "%";
-            fontRenderer.drawString(progress, x + DETAIL_WIDTH - fontRenderer.getStringWidth(progress) - 4, rowY + 7, thread.working ? 0xFF5FE69A : 0xFF9EA8B2);
+            fontRenderer.drawString(progress, x + DETAIL_WIDTH - fontRenderer.getStringWidth(progress) - 6, rowY + 7, thread.working ? 0xFF5FE69A : 0xFF9EA8B2);
             boolean overIcon = inside(mouseX, mouseY, x + 12, rowY + 3, 16, 16);
             if (overIcon) {
                 String name = thread.output == null ? "" : thread.output.displayName();
                 if (name == null || name.isEmpty()) {
-                    drawHoveringText(I18n.format("gui.modular_machinery_terminal.no_output"), mouseX, mouseY);
+                    tooltip = I18n.format("gui.modular_machinery_terminal.no_output");
                 } else {
-                    drawHoveringText(name, mouseX, mouseY);
+                    tooltip = name;
                 }
-            } else if (inside(mouseX, mouseY, x, rowY, DETAIL_WIDTH, ROW_HEIGHT - 2) && !thread.status.isEmpty()) {
-                drawHoveringText(localizeStatus(thread.status), mouseX, mouseY);
+            } else if (inside(mouseX, mouseY, x, rowY, DETAIL_WIDTH - 2, ROW_HEIGHT - 2) && !thread.status.isEmpty()) {
+                tooltip = localizeStatus(thread.status);
             }
         }
+        drawScrollbar(x + DETAIL_WIDTH, y, 3, rows * ROW_HEIGHT - 2, machine.threads.size(), rows, threadScroll);
+        if (tooltip != null) {
+            drawHoveringText(tooltip, mouseX, mouseY);
+        }
+    }
+
+    private int visibleThreadRows(int y) {
+        return Math.max(0, (guiTop() + GUI_HEIGHT - 8 - y) / ROW_HEIGHT);
+    }
+
+    private void drawScrollbar(int x, int y, int width, int height, int total, int visible, int offset) {
+        if (total <= visible || visible <= 0 || height <= 0) {
+            drawRect(x, y, x + width, y + height, 0xFF20262B);
+            return;
+        }
+        drawRect(x, y, x + width, y + height, 0xFF20262B);
+        int thumbHeight = Math.max(10, height * visible / total);
+        int thumbTravel = height - thumbHeight;
+        int maxOffset = total - visible;
+        int thumbY = y + (maxOffset <= 0 ? 0 : thumbTravel * offset / maxOffset);
+        drawRect(x, thumbY, x + width, thumbY + thumbHeight, 0xFF6F7982);
     }
 
     private void drawStatusLamp(int x, int y, MachineInfo machine) {
@@ -439,12 +481,24 @@ public class GuiTerminal extends GuiScreen {
         return inside(mouseX, mouseY, left + 6, top + CONTENT_TOP, LIST_WIDTH + 6, GUI_HEIGHT - CONTENT_TOP - 8);
     }
 
+    private boolean overDetailPanel() {
+        int mouseX = Mouse.getEventX() * width / mc.displayWidth;
+        int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
+        int left = guiLeft();
+        int top = guiTop();
+        return inside(mouseX, mouseY, left + LIST_WIDTH + 16, top + CONTENT_TOP, GUI_WIDTH - LIST_WIDTH - 24, GUI_HEIGHT - CONTENT_TOP - 8);
+    }
+
+    private int threadStartY() {
+        return guiTop() + CONTENT_TOP + 68;
+    }
+
     private boolean inside(int mouseX, int mouseY, int x, int y, int w, int h) {
         return mouseX >= x && mouseY >= y && mouseX < x + w && mouseY < y + h;
     }
 
     private int visibleRowCount() {
-        return 5;
+        return 6;
     }
 
     private int sortX(int left) {

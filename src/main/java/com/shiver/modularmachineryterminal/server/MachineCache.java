@@ -87,7 +87,7 @@ public class MachineCache {
         SummaryInfo summary = new SummaryInfo();
         UUID playerId = player.getUniqueID();
         for (CachedMachine cached : CACHE.values()) {
-            if (!playerId.equals(cached.owner)) {
+            if (!visibleTo(cached, playerId)) {
                 continue;
             }
             MachineInfo info = cached.info;
@@ -113,7 +113,7 @@ public class MachineCache {
         UUID playerId = player.getUniqueID();
         for (MachineKey key : keys) {
             CachedMachine cached = CACHE.get(key);
-            if (cached != null && playerId.equals(cached.owner)) {
+            if (visibleTo(cached, playerId)) {
                 machines.add(cached.info);
             } else {
                 removed.add(key);
@@ -197,7 +197,7 @@ public class MachineCache {
     }
 
     private static boolean update(TileMultiblockMachineController controller, boolean loaded) {
-        if (controller == null || controller.getWorld() == null || controller.getOwner() == null) {
+        if (controller == null || controller.getWorld() == null) {
             return false;
         }
 
@@ -206,6 +206,10 @@ public class MachineCache {
         cached.owner = controller.getOwner();
         cached.info = capture(controller, loaded);
         return true;
+    }
+
+    private static boolean visibleTo(CachedMachine cached, UUID playerId) {
+        return cached != null && (cached.owner == null || playerId.equals(cached.owner));
     }
 
     private static MachineInfo capture(TileMultiblockMachineController controller, boolean loaded) {
@@ -272,9 +276,17 @@ public class MachineCache {
 
     private static int maxThreads(TileMultiblockMachineController controller, RecipeThread[] threads) {
         if (controller instanceof TileFactoryController) {
-            return ((TileFactoryController) controller).getMaxThreads();
+            return safeMaxThreads((TileFactoryController) controller);
         }
         return threads == null ? 0 : threads.length;
+    }
+
+    private static int safeMaxThreads(TileFactoryController controller) {
+        try {
+            return Math.max(0, controller.getMaxThreads());
+        } catch (NullPointerException ignored) {
+            return 0;
+        }
     }
 
     private static String machineName(TileMultiblockMachineController controller) {
