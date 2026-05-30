@@ -42,7 +42,6 @@ public class GuiTerminal extends GuiScreen {
     private MachineKey selected;
     private SortMode sortMode = SortMode.NAME;
     private boolean descending;
-    private boolean drawerOpen;
     private int scroll;
 
     @Override
@@ -87,7 +86,6 @@ public class GuiTerminal extends GuiScreen {
         drawControls(left, top, mouseX, mouseY);
         drawMachineList(left, top, mouseX, mouseY);
         drawDetails(left, top, mouseX, mouseY);
-        drawTooltips(mouseX, mouseY);
     }
 
     @Override
@@ -115,17 +113,7 @@ public class GuiTerminal extends GuiScreen {
             int y = listY + i * ROW_HEIGHT;
             if (inside(mouseX, mouseY, listX, y, LIST_ROW_WIDTH, ROW_HEIGHT - 2)) {
                 selected = visible.get(scroll + i).key;
-                drawerOpen = false;
                 TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys()));
-            }
-        }
-
-        int drawerX = left + LIST_WIDTH + 18;
-        int drawerY = top + 142;
-        if (inside(mouseX, mouseY, drawerX, drawerY, DETAIL_WIDTH, 14)) {
-            MachineInfo machine = selectedMachine();
-            if (machine != null && machine.loaded) {
-                drawerOpen = !drawerOpen;
             }
         }
     }
@@ -240,10 +228,10 @@ public class GuiTerminal extends GuiScreen {
             return;
         }
 
-        drawItem(machine.controllerIcon, x, y + 1, !machine.loaded);
+        drawItem(machine.controllerIcon, x + 3, y + 4, !machine.loaded);
         fontRenderer.drawString(trim(machine.name, 118), x + 24, y + 2, machine.loaded ? 0xFFE2E7EA : 0xFF888888);
         BlockPos pos = machine.key.pos;
-        fontRenderer.drawString("D" + machine.key.dimension + " " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(), x + 24, y + 13, 0xFF9EA8B2);
+        fontRenderer.drawString("Dim" + machine.key.dimension + " " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ(), x + 24, y + 13, 0xFF9EA8B2);
         y += 26;
 
         if (!machine.loaded) {
@@ -258,49 +246,27 @@ public class GuiTerminal extends GuiScreen {
         fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.threads") + ": " + machine.activeThreads + "/" + machine.maxThreads, x, y, 0xFFD8DEE5);
         y += 11;
         fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.parallelism") + ": " + machine.parallelism + "/" + machine.maxParallelism, x, y, 0xFFD8DEE5);
-        y += 12;
-        fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.output") + ":", x, y + 4, 0xFFD8DEE5);
-        drawOutput(machine.output, x + 34, y, 0xFFE2E7EA);
+        y += 13;
 
-        drawDrawer(x, top + 142, machine, mouseX, mouseY);
+        drawThreads(x, y, machine, mouseX, mouseY);
     }
 
-    private void drawDrawer(int x, int y, MachineInfo machine, int mouseX, int mouseY) {
-        drawRect(x, y, x + DETAIL_WIDTH, y + 14, machine.loaded ? 0xFF26323A : 0xFF252525);
-        String arrow = drawerOpen ? "v" : ">";
-        String hidden = machine.threads.size() > 2 ? " +" + (machine.threads.size() - 2) : "";
-        fontRenderer.drawString(arrow + " " + I18n.format("gui.modular_machinery_terminal.thread_outputs") + " " + machine.threads.size() + hidden, x + 4, y + 3, machine.loaded ? 0xFFD8DEE5 : 0xFF777777);
-        if (!drawerOpen || !machine.loaded) {
+    private void drawThreads(int x, int y, MachineInfo machine, int mouseX, int mouseY) {
+        if (machine.threads.isEmpty()) {
+            fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.thread_outputs") + ": 0", x, y, 0xFF888888);
             return;
         }
-        int rowY = y + 16;
-        int count = Math.min(2, machine.threads.size());
-        for (int i = 0; i < count; i++) {
+
+        for (int i = 0; i < machine.threads.size(); i++) {
             ThreadInfo thread = machine.threads.get(i);
-            drawRect(x, rowY, x + DETAIL_WIDTH, rowY + 13, 0xFF20262B);
-            fontRenderer.drawString(trim(thread.name, 38), x + 3, rowY + 2, thread.working ? 0xFF5FE69A : 0xFFBFC7CF);
-            fontRenderer.drawString(thread.parallelism + "/" + thread.maxParallelism, x + 45, rowY + 2, 0xFFD8DEE5);
-            drawOutput(thread.output, x + 72, rowY - 1, 0xFFD8DEE5);
-            if (inside(mouseX, mouseY, x, rowY, DETAIL_WIDTH, 13) && !thread.status.isEmpty()) {
+            int rowY = y + i * ROW_HEIGHT;
+            drawRect(x, rowY, x + DETAIL_WIDTH, rowY + ROW_HEIGHT - 2, 0xFF22272D);
+            drawThreadStatusLamp(x + 4, rowY + 4, thread);
+            drawOutputIcon(thread.output, x + 12, rowY + 3);
+            fontRenderer.drawString(trim(thread.name, 82), x + 34, rowY + 1, thread.working ? 0xFFE2E7EA : 0xFFBFC7CF);
+            fontRenderer.drawString(thread.parallelism + "/" + thread.maxParallelism, x + 34, rowY + 11, 0xFF9EA8B2);
+            if (inside(mouseX, mouseY, x, rowY, DETAIL_WIDTH, ROW_HEIGHT - 2) && !thread.status.isEmpty()) {
                 drawHoveringText(localizeStatus(thread.status), mouseX, mouseY);
-            }
-            rowY += 14;
-        }
-    }
-
-    private void drawTooltips(int mouseX, int mouseY) {
-        MachineInfo machine = selectedMachine();
-        if (machine == null || !machine.loaded) {
-            return;
-        }
-        int left = guiLeft();
-        int top = guiTop();
-        int outputX = left + LIST_WIDTH + 52;
-        int outputY = top + 122;
-        if (inside(mouseX, mouseY, outputX, outputY, 16, 16)) {
-            String name = machine.output.displayName();
-            if (name != null && !name.isEmpty()) {
-                drawHoveringText(name, mouseX, mouseY);
             }
         }
     }
@@ -314,8 +280,14 @@ public class GuiTerminal extends GuiScreen {
         } else if (machine.loaded) {
             color = 0xFFE05C43;
         }
-        drawRect(x, y, x + 2, y + 13, color);
-        drawRect(x + 2, y, x + 3, y + 13, 0x66000000);
+        drawRect(x, y, x + 2, y + 14, color);
+        drawRect(x + 2, y, x + 3, y + 14, 0x66000000);
+    }
+
+    private void drawThreadStatusLamp(int x, int y, ThreadInfo thread) {
+        int color = thread.working ? 0xFF43E06D : 0xFFE2C84A;
+        drawRect(x, y, x + 2, y + 14, color);
+        drawRect(x + 2, y, x + 3, y + 14, 0x66000000);
     }
 
     private void drawItem(ItemStack stack, int x, int y, boolean grey) {
@@ -330,9 +302,9 @@ public class GuiTerminal extends GuiScreen {
         RenderHelper.disableStandardItemLighting();
     }
 
-    private void drawOutput(OutputInfo output, int x, int y, int color) {
+    private void drawOutputIcon(OutputInfo output, int x, int y) {
         if (output == null || output.type == OutputInfo.Type.NONE) {
-            fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.no_output"), x, y + 4, 0xFF888888);
+            drawRect(x, y, x + 16, y + 16, 0xFF39424B);
             return;
         }
         if (output.type == OutputInfo.Type.ITEM) {
@@ -341,15 +313,13 @@ public class GuiTerminal extends GuiScreen {
         }
         if (output.type == OutputInfo.Type.FLUID && output.fluid != null) {
             drawFluid(output.fluid, x, y);
-            fontRenderer.drawString(trim(output.displayName(), 42), x + 18, y + 4, color);
             return;
         }
         if (output.type == OutputInfo.Type.GAS) {
             drawRect(x, y, x + 16, y + 16, 0xFF7CC7D9);
-            fontRenderer.drawString(trim(output.displayName(), 42), x + 18, y + 4, color);
             return;
         }
-        fontRenderer.drawString(trim(output.displayName(), 72), x, y + 4, color);
+        drawRect(x, y, x + 16, y + 16, 0xFF39424B);
     }
 
     private void drawFluid(FluidStack fluid, int x, int y) {

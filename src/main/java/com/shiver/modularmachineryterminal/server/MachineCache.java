@@ -216,7 +216,7 @@ public class MachineCache {
         }
 
         if (info.maxParallelism <= 0) {
-            info.maxParallelism = Math.max(0, controller.getMaxParallelism());
+            info.maxParallelism = safeMaxParallelism(controller);
         }
         if (info.output.type == OutputInfo.Type.NONE && controller.getActiveRecipe() != null) {
             info.output = firstOutput(controller.getActiveRecipe());
@@ -295,6 +295,14 @@ public class MachineCache {
         }
         String text = status.getUnlocMessage();
         return text == null ? "" : text;
+    }
+
+    private static int safeMaxParallelism(TileMultiblockMachineController controller) {
+        try {
+            return Math.max(0, controller.getMaxParallelism());
+        } catch (NullPointerException ignored) {
+            return 0;
+        }
     }
 
     private static OutputInfo firstOutput(ActiveMachineRecipe activeRecipe) {
