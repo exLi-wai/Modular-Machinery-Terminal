@@ -1,0 +1,57 @@
+package com.shiver.modularmachineryterminal.network;
+
+import com.shiver.modularmachineryterminal.common.MachineKey;
+import com.shiver.modularmachineryterminal.server.MachineCache;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.network.PacketBuffer;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
+import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
+import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class PacketRequestDynamic implements IMessage {
+
+    private final List<MachineKey> keys = new ArrayList<>();
+
+    public PacketRequestDynamic() {
+    }
+
+    public PacketRequestDynamic(List<MachineKey> keys) {
+        this.keys.addAll(keys);
+    }
+
+    @Override
+    public void fromBytes(ByteBuf buf) {
+        PacketBuffer buffer = new PacketBuffer(buf);
+        keys.clear();
+        int count = buffer.readInt();
+        for (int i = 0; i < count; i++) {
+            keys.add(MachineKey.read(buffer));
+        }
+    }
+
+    @Override
+    public void toBytes(ByteBuf buf) {
+        PacketBuffer buffer = new PacketBuffer(buf);
+        buffer.writeInt(keys.size());
+        for (MachineKey key : keys) {
+            key.write(buffer);
+        }
+    }
+
+    public static class Handler implements IMessageHandler<PacketRequestDynamic, IMessage> {
+
+        @Override
+        public IMessage onMessage(PacketRequestDynamic message, MessageContext ctx) {
+            EntityPlayerMP player = ctx.getServerHandler().player;
+            player.getServerWorld().addScheduledTask(() -> TerminalNetwork.CHANNEL.sendTo(
+                    MachineCache.createDynamicPacket(player, message.keys),
+                    player
+            ));
+            return null;
+        }
+    }
+}
