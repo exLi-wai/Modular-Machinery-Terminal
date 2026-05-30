@@ -25,14 +25,12 @@ public final class ClientTerminalData {
         }
     }
 
-    public static void updateDynamic(List<MachineInfo> machines) {
+    public static void updateDynamic(List<MachineInfo> machines, List<MachineKey> removed) {
+        for (MachineKey key : removed) {
+            MACHINES.remove(key);
+        }
         for (MachineInfo dynamic : machines) {
-            MachineInfo existing = MACHINES.get(dynamic.key);
-            if (existing == null) {
-                MACHINES.put(dynamic.key, dynamic);
-            } else {
-                MACHINES.put(dynamic.key, dynamic);
-            }
+            MACHINES.put(dynamic.key, dynamic);
         }
     }
 

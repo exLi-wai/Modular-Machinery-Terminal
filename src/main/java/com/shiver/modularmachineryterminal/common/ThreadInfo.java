@@ -9,6 +9,7 @@ public class ThreadInfo {
     public boolean working;
     public int parallelism;
     public int maxParallelism;
+    public int progress;
     public OutputInfo output = OutputInfo.none();
 
     public void write(PacketBuffer buffer) {
@@ -17,6 +18,7 @@ public class ThreadInfo {
         buffer.writeBoolean(working);
         buffer.writeInt(parallelism);
         buffer.writeInt(maxParallelism);
+        buffer.writeInt(progress);
         output.write(buffer);
     }
 
@@ -27,6 +29,7 @@ public class ThreadInfo {
         info.working = buffer.readBoolean();
         info.parallelism = buffer.readInt();
         info.maxParallelism = buffer.readInt();
+        info.progress = buffer.readInt();
         info.output = OutputInfo.read(buffer);
         return info;
     }

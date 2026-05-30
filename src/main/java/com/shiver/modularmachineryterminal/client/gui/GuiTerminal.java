@@ -131,7 +131,7 @@ public class GuiTerminal extends GuiScreen {
     public void handleMouseInput() throws IOException {
         super.handleMouseInput();
         int wheel = Mouse.getEventDWheel();
-        if (wheel != 0) {
+        if (wheel != 0 && overListPanel()) {
             List<MachineInfo> visible = visibleMachines();
             int maxScroll = Math.max(0, visible.size() - visibleRowCount());
             scroll += wheel < 0 ? 1 : -1;
@@ -211,11 +211,6 @@ public class GuiTerminal extends GuiScreen {
             BlockPos pos = machine.key.pos;
             String coord = "Dim" + machine.key.dimension + " " + pos.getX() + "," + pos.getY() + "," + pos.getZ();
             fontRenderer.drawString(trim(coord, 82), listX + 34, y + 11, machine.loaded ? 0xFF9EA8B2 : 0xFF777777);
-            if (inside(mouseX, mouseY, listX + 2, y + 3, 7, 16)) {
-                drawHoveringText(statusTooltip(machine), mouseX, mouseY);
-            } else if (inside(mouseX, mouseY, listX, y, LIST_ROW_WIDTH, ROW_HEIGHT - 2) && !machine.loaded) {
-                drawHoveringText(I18n.format("gui.modular_machinery_terminal.machine_unloaded"), mouseX, mouseY);
-            }
         }
     }
 
@@ -263,9 +258,19 @@ public class GuiTerminal extends GuiScreen {
             drawRect(x, rowY, x + DETAIL_WIDTH, rowY + ROW_HEIGHT - 2, 0xFF22272D);
             drawThreadStatusLamp(x + 4, rowY + 4, thread);
             drawOutputIcon(thread.output, x + 12, rowY + 3);
-            fontRenderer.drawString(trim(thread.name, 82), x + 34, rowY + 1, thread.working ? 0xFFE2E7EA : 0xFFBFC7CF);
-            fontRenderer.drawString(thread.parallelism + "/" + thread.maxParallelism, x + 34, rowY + 11, 0xFF9EA8B2);
-            if (inside(mouseX, mouseY, x, rowY, DETAIL_WIDTH, ROW_HEIGHT - 2) && !thread.status.isEmpty()) {
+            fontRenderer.drawString(trim(thread.name, 60), x + 34, rowY + 1, thread.working ? 0xFFE2E7EA : 0xFFBFC7CF);
+            fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.parallelism") + ": " + thread.parallelism, x + 34, rowY + 11, 0xFF9EA8B2);
+            String progress = thread.progress + "%";
+            fontRenderer.drawString(progress, x + DETAIL_WIDTH - fontRenderer.getStringWidth(progress) - 4, rowY + 7, thread.working ? 0xFF5FE69A : 0xFF9EA8B2);
+            boolean overIcon = inside(mouseX, mouseY, x + 12, rowY + 3, 16, 16);
+            if (overIcon) {
+                String name = thread.output == null ? "" : thread.output.displayName();
+                if (name == null || name.isEmpty()) {
+                    drawHoveringText(I18n.format("gui.modular_machinery_terminal.no_output"), mouseX, mouseY);
+                } else {
+                    drawHoveringText(name, mouseX, mouseY);
+                }
+            } else if (inside(mouseX, mouseY, x, rowY, DETAIL_WIDTH, ROW_HEIGHT - 2) && !thread.status.isEmpty()) {
                 drawHoveringText(localizeStatus(thread.status), mouseX, mouseY);
             }
         }
@@ -403,19 +408,6 @@ public class GuiTerminal extends GuiScreen {
         return status;
     }
 
-    private String statusTooltip(MachineInfo machine) {
-        if (!machine.loaded) {
-            return I18n.format("gui.modular_machinery_terminal.status.unloaded");
-        }
-        if (machine.running) {
-            return I18n.format("gui.modular_machinery_terminal.status.running");
-        }
-        if (machine.formed) {
-            return I18n.format("gui.modular_machinery_terminal.status.formed_idle");
-        }
-        return I18n.format("gui.modular_machinery_terminal.status.invalid");
-    }
-
     private String trim(String value, int width) {
         if (value == null) {
             return "";
@@ -437,6 +429,14 @@ public class GuiTerminal extends GuiScreen {
 
     private int guiTop() {
         return (height - GUI_HEIGHT) / 2;
+    }
+
+    private boolean overListPanel() {
+        int mouseX = Mouse.getEventX() * width / mc.displayWidth;
+        int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
+        int left = guiLeft();
+        int top = guiTop();
+        return inside(mouseX, mouseY, left + 6, top + CONTENT_TOP, LIST_WIDTH + 6, GUI_HEIGHT - CONTENT_TOP - 8);
     }
 
     private boolean inside(int mouseX, int mouseY, int x, int y, int w, int h) {

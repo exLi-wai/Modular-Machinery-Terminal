@@ -31,6 +31,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.event.world.BlockEvent;
+import net.minecraftforge.event.world.ChunkEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
@@ -63,6 +64,23 @@ public class MachineCache {
         CACHE.remove(key);
     }
 
+    @SubscribeEvent
+    public void onChunkUnload(ChunkEvent.Unload event) {
+        if (event.getWorld() == null || event.getWorld().isRemote || event.getChunk() == null) {
+            return;
+        }
+
+        int dimension = event.getWorld().provider.getDimension();
+        int chunkX = event.getChunk().x;
+        int chunkZ = event.getChunk().z;
+        for (Map.Entry<MachineKey, CachedMachine> entry : CACHE.entrySet()) {
+            MachineKey key = entry.getKey();
+            if (key.dimension == dimension && (key.pos.getX() >> 4) == chunkX && (key.pos.getZ() >> 4) == chunkZ) {
+                markUnloaded(entry.getValue());
+            }
+        }
+    }
+
     public static PacketFullList createFullListPacket(EntityPlayerMP player) {
         refreshLoadedMachines();
         List<MachineInfo> machines = new ArrayList<>();
@@ -91,14 +109,17 @@ public class MachineCache {
     public static PacketDynamic createDynamicPacket(EntityPlayerMP player, List<MachineKey> keys) {
         refreshLoadedMachines();
         List<MachineInfo> machines = new ArrayList<>();
+        List<MachineKey> removed = new ArrayList<>();
         UUID playerId = player.getUniqueID();
         for (MachineKey key : keys) {
             CachedMachine cached = CACHE.get(key);
             if (cached != null && playerId.equals(cached.owner)) {
                 machines.add(cached.info);
+            } else {
+                removed.add(key);
             }
         }
-        return new PacketDynamic(machines);
+        return new PacketDynamic(machines, removed);
     }
 
     private static void refreshLoadedMachines() {
@@ -239,6 +260,7 @@ public class MachineCache {
         if (activeRecipe != null) {
             info.parallelism = Math.max(0, activeRecipe.getParallelism());
             info.maxParallelism = Math.max(0, activeRecipe.getMaxParallelism());
+            info.progress = recipeProgress(activeRecipe);
             info.output = firstOutput(activeRecipe);
             MachineRecipe recipe = activeRecipe.getRecipe();
             if (recipe != null && recipe.getThreadName() != null && !recipe.getThreadName().isEmpty()) {
@@ -303,6 +325,15 @@ public class MachineCache {
         } catch (NullPointerException ignored) {
             return 0;
         }
+    }
+
+    private static int recipeProgress(ActiveMachineRecipe activeRecipe) {
+        int totalTick = activeRecipe.getTotalTick();
+        if (totalTick <= 0) {
+            return 0;
+        }
+        int tick = activeRecipe.getTick();
+        return Math.max(0, Math.min(100, tick * 100 / totalTick));
     }
 
     private static OutputInfo firstOutput(ActiveMachineRecipe activeRecipe) {
