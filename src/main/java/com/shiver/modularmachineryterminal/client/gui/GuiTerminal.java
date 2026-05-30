@@ -161,7 +161,7 @@ public class GuiTerminal extends GuiScreen {
         drawRect(left + 3, top + 3, left + GUI_WIDTH - 3, top + GUI_HEIGHT - 3, 0xFF2B3036);
         drawRect(left + 6, top + CONTENT_TOP, left + LIST_WIDTH + 12, top + GUI_HEIGHT - 8, 0xFF14181C);
         drawRect(left + LIST_WIDTH + 16, top + CONTENT_TOP, left + GUI_WIDTH - 8, top + GUI_HEIGHT - 8, 0xFF14181C);
-        drawRect(left + 6, top + 28, left + GUI_WIDTH - 84, top + 30, 0xFF4A545F);
+        drawRect(left + 6, top + 28, legendX(left) - 8, top + 30, 0xFF4A545F);
     }
 
     private void drawHeader(int left, int top) {
@@ -179,12 +179,12 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private void drawLegend(int left, int top) {
-        int x = left + GUI_WIDTH - 76;
-        int y = top + 6;
+        int x = legendX(left);
+        int y = top + 9;
         drawLegendItem(x, y, 0xFF43E06D, I18n.format("gui.modular_machinery_terminal.legend.running"));
-        drawLegendItem(x, y + 8, 0xFFE2C84A, I18n.format("gui.modular_machinery_terminal.legend.idle"));
-        drawLegendItem(x, y + 16, 0xFFE05C43, I18n.format("gui.modular_machinery_terminal.legend.invalid"));
-        drawLegendItem(x, y + 24, 0xFF777777, I18n.format("gui.modular_machinery_terminal.legend.unloaded"));
+        drawLegendItem(x, y + 9, 0xFFE2C84A, I18n.format("gui.modular_machinery_terminal.legend.idle"));
+        drawLegendItem(x, y + 18, 0xFFE05C43, I18n.format("gui.modular_machinery_terminal.legend.invalid"));
+        drawLegendItem(x, y + 27, 0xFF777777, I18n.format("gui.modular_machinery_terminal.legend.unloaded"));
     }
 
     private void drawLegendItem(int x, int y, int color, String text) {
@@ -217,7 +217,7 @@ public class GuiTerminal extends GuiScreen {
             int bg = isSelected ? 0xFF314B5A : 0xFF22272D;
             drawRect(listX, y, listX + LIST_ROW_WIDTH, y + ROW_HEIGHT - 2, bg);
             drawStatusLamp(listX + 4, y + 5, machine);
-            drawItem(machine.controllerIcon, listX + 12, y + 4, !machine.loaded);
+            drawItem(machine.controllerIcon, listX + 12, y + 3, !machine.loaded);
             int textColor = machine.loaded ? 0xFFE2E7EA : 0xFF888888;
             fontRenderer.drawString(trim(machine.name, 82), listX + 34, y + 1, textColor);
             BlockPos pos = machine.key.pos;
@@ -483,6 +483,10 @@ public class GuiTerminal extends GuiScreen {
 
     private int directionX(int left) {
         return left + 155;
+    }
+
+    private int legendX(int left) {
+        return left + GUI_WIDTH - 40;
     }
 
     @Override

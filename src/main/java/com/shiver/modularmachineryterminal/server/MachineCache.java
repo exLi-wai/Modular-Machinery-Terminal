@@ -29,6 +29,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
@@ -36,9 +38,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class MachineCache {
@@ -48,6 +52,15 @@ public class MachineCache {
     @SubscribeEvent
     public void onMachineTick(MachineTickEvent event) {
         update(event.getController(), true);
+    }
+
+    @SubscribeEvent
+    public void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (event.getWorld() == null || event.getWorld().isRemote) {
+            return;
+        }
+        MachineKey key = new MachineKey(event.getWorld().provider.getDimension(), event.getPos());
+        CACHE.remove(key);
     }
 
     public static PacketFullList createFullListPacket(EntityPlayerMP player) {
@@ -89,11 +102,7 @@ public class MachineCache {
     }
 
     private static void refreshLoadedMachines() {
-        for (CachedMachine cached : CACHE.values()) {
-            cached.info.loaded = false;
-            cached.info.running = false;
-            cached.info.activeThreads = 0;
-        }
+        Set<MachineKey> foundLoaded = new HashSet<>();
 
         MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) {
@@ -101,23 +110,81 @@ public class MachineCache {
         }
 
         for (WorldServer world : server.worlds) {
-            for (TileEntity tile : new ArrayList<>(world.loadedTileEntityList)) {
-                if (tile instanceof TileMultiblockMachineController) {
-                    update((TileMultiblockMachineController) tile, true);
+            scanWorld(world, foundLoaded);
+        }
+
+        List<MachineKey> remove = new ArrayList<>();
+        for (Map.Entry<MachineKey, CachedMachine> entry : CACHE.entrySet()) {
+            if (!foundLoaded.contains(entry.getKey())) {
+                if (isCachedPositionLoaded(server, entry.getKey())) {
+                    remove.add(entry.getKey());
+                } else {
+                    markUnloaded(entry.getValue());
                 }
             }
         }
+        for (MachineKey key : remove) {
+            CACHE.remove(key);
+        }
     }
 
-    private static void update(TileMultiblockMachineController controller, boolean loaded) {
-        if (controller == null || controller.getWorld() == null || controller.getOwner() == null) {
+    private static void scanWorld(WorldServer world, Set<MachineKey> foundLoaded) {
+        for (Chunk chunk : new ArrayList<>(world.getChunkProvider().getLoadedChunks())) {
+            for (TileEntity tile : new ArrayList<>(chunk.getTileEntityMap().values())) {
+                trackTile(tile, foundLoaded);
+            }
+        }
+
+        for (TileEntity tile : new ArrayList<>(world.loadedTileEntityList)) {
+            trackTile(tile, foundLoaded);
+        }
+    }
+
+    private static void trackTile(TileEntity tile, Set<MachineKey> foundLoaded) {
+        if (!(tile instanceof TileMultiblockMachineController)) {
             return;
+        }
+        TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
+        if (controller.getWorld() == null) {
+            return;
+        }
+        MachineKey key = new MachineKey(controller.getWorld().provider.getDimension(), controller.getPos());
+        if (update(controller, true)) {
+            foundLoaded.add(key);
+        }
+    }
+
+    private static void markUnloaded(CachedMachine cached) {
+        if (cached == null || cached.info == null) {
+            return;
+        }
+        cached.info.loaded = false;
+        cached.info.running = false;
+        cached.info.activeThreads = 0;
+        cached.info.parallelism = 0;
+        cached.info.threads.clear();
+    }
+
+    private static boolean isCachedPositionLoaded(MinecraftServer server, MachineKey key) {
+        WorldServer world = server.getWorld(key.dimension);
+        if (world == null) {
+            return false;
+        }
+        int chunkX = key.pos.getX() >> 4;
+        int chunkZ = key.pos.getZ() >> 4;
+        return world.getChunkProvider().getLoadedChunk(chunkX, chunkZ) != null;
+    }
+
+    private static boolean update(TileMultiblockMachineController controller, boolean loaded) {
+        if (controller == null || controller.getWorld() == null || controller.getOwner() == null) {
+            return false;
         }
 
         MachineKey key = new MachineKey(controller.getWorld().provider.getDimension(), controller.getPos());
         CachedMachine cached = CACHE.computeIfAbsent(key, ignored -> new CachedMachine());
         cached.owner = controller.getOwner();
         cached.info = capture(controller, loaded);
+        return true;
     }
 
     private static MachineInfo capture(TileMultiblockMachineController controller, boolean loaded) {
