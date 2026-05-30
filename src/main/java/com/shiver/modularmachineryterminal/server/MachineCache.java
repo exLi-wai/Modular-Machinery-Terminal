@@ -13,11 +13,15 @@ import hellfirepvp.modularmachinery.common.crafting.ActiveMachineRecipe;
 import hellfirepvp.modularmachinery.common.crafting.MachineRecipe;
 import hellfirepvp.modularmachinery.common.crafting.helper.ComponentRequirement;
 import hellfirepvp.modularmachinery.common.crafting.helper.CraftingStatus;
+import hellfirepvp.modularmachinery.common.crafting.helper.RecipeCraftingContext;
+import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementEnergy;
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementFluid;
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementItem;
+import hellfirepvp.modularmachinery.common.lib.RequirementTypesMM;
 import hellfirepvp.modularmachinery.common.machine.DynamicMachine;
 import hellfirepvp.modularmachinery.common.machine.IOType;
 import hellfirepvp.modularmachinery.common.machine.RecipeThread;
+import hellfirepvp.modularmachinery.common.modifier.RecipeModifier;
 import hellfirepvp.modularmachinery.common.tiles.TileFactoryController;
 import hellfirepvp.modularmachinery.common.tiles.TileMachineController;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
@@ -183,6 +187,7 @@ public class MachineCache {
         cached.info.running = false;
         cached.info.activeThreads = 0;
         cached.info.parallelism = 0;
+        cached.info.energyPerTick = 0;
         cached.info.threads.clear();
     }
 
@@ -231,6 +236,7 @@ public class MachineCache {
                 if (threadInfo.working) {
                     info.activeThreads++;
                 }
+                info.energyPerTick += energyPerTick(thread);
                 info.parallelism += threadInfo.parallelism;
                 info.maxParallelism += threadInfo.maxParallelism;
                 if (info.output.type == OutputInfo.Type.NONE && threadInfo.output.type != OutputInfo.Type.NONE) {
@@ -346,6 +352,25 @@ public class MachineCache {
         }
         int tick = activeRecipe.getTick();
         return Math.max(0, Math.min(100, tick * 100 / totalTick));
+    }
+
+    private static long energyPerTick(RecipeThread thread) {
+        if (thread == null || thread.getActiveRecipe() == null) {
+            return 0;
+        }
+        RecipeCraftingContext context = thread.getContext();
+        if (context == null) {
+            return 0;
+        }
+        List<ComponentRequirement<?, ?>> requirements = context.getRequirementBy(RequirementTypesMM.REQUIREMENT_ENERGY, IOType.INPUT);
+        if (requirements.isEmpty() || !(requirements.get(0) instanceof RequirementEnergy)) {
+            return 0;
+        }
+        RequirementEnergy energy = (RequirementEnergy) requirements.get(0);
+        long perTick = energy.getRequiredEnergyPerTick();
+        return Math.round(RecipeModifier.applyModifiers(context, energy, (double) perTick, false)
+                * context.getDurationMultiplier()
+                * energy.getParallelism());
     }
 
     private static OutputInfo firstOutput(ActiveMachineRecipe activeRecipe) {

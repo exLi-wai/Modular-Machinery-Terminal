@@ -255,9 +255,12 @@ public class GuiTerminal extends GuiScreen {
         y += 11;
         fontRenderer.drawString(trim(I18n.format("gui.modular_machinery_terminal.reason") + ": " + localizeStatus(machine.status), DETAIL_WIDTH), x, y, 0xFFBFC7CF);
         y += 11;
-        fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.threads") + ": " + machine.activeThreads + "/" + machine.maxThreads, x, y, 0xFFD8DEE5);
+        String threads = I18n.format("gui.modular_machinery_terminal.threads") + ": " + machine.activeThreads + "/" + machine.maxThreads;
+        String parallelism = I18n.format("gui.modular_machinery_terminal.parallelism") + ": " + machine.parallelism + "/" + machine.maxParallelism;
+        fontRenderer.drawString(trim(threads, 55), x, y, 0xFFD8DEE5);
+        fontRenderer.drawString(trim(parallelism, DETAIL_WIDTH - 57), x + 57, y, 0xFFD8DEE5);
         y += 11;
-        fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.parallelism") + ": " + machine.parallelism + "/" + machine.maxParallelism, x, y, 0xFFD8DEE5);
+        fontRenderer.drawString(trim(I18n.format("gui.modular_machinery_terminal.energy") + ": " + formatEnergy(machine.energyPerTick), DETAIL_WIDTH), x, y, 0xFFD8DEE5);
         y += 13;
 
         drawThreads(x, y + 1, machine, mouseX, mouseY);
@@ -493,6 +496,10 @@ public class GuiTerminal extends GuiScreen {
         return fontRenderer.trimStringToWidth(value, width);
     }
 
+    private String formatEnergy(long energyPerTick) {
+        return energyPerTick <= 0 ? "0 RF/t" : energyPerTick + " RF/t";
+    }
+
     private String sortLabel() {
         return I18n.format("gui.modular_machinery_terminal.sort") + ":" + I18n.format(sortMode.key);
     }
@@ -526,7 +533,7 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private int threadStartY() {
-        return guiTop() + CONTENT_TOP + 68;
+        return guiTop() + CONTENT_TOP + 78;
     }
 
     private boolean inside(int mouseX, int mouseY, int x, int y, int w, int h) {

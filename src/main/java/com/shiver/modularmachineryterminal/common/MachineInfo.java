@@ -19,6 +19,7 @@ public class MachineInfo {
     public int maxThreads;
     public int parallelism;
     public int maxParallelism;
+    public long energyPerTick;
     public OutputInfo output = OutputInfo.none();
     public final List<ThreadInfo> threads = new ArrayList<>();
 
@@ -35,6 +36,7 @@ public class MachineInfo {
         copy.maxThreads = maxThreads;
         copy.parallelism = parallelism;
         copy.maxParallelism = maxParallelism;
+        copy.energyPerTick = energyPerTick;
         copy.output = output;
         return copy;
     }
@@ -51,6 +53,7 @@ public class MachineInfo {
         buffer.writeInt(maxThreads);
         buffer.writeInt(parallelism);
         buffer.writeInt(maxParallelism);
+        buffer.writeLong(energyPerTick);
         output.write(buffer);
         buffer.writeInt(threads.size());
         for (ThreadInfo thread : threads) {
@@ -75,6 +78,7 @@ public class MachineInfo {
         info.maxThreads = buffer.readInt();
         info.parallelism = buffer.readInt();
         info.maxParallelism = buffer.readInt();
+        info.energyPerTick = buffer.readLong();
         info.output = OutputInfo.read(buffer);
         int count = buffer.readInt();
         for (int i = 0; i < count; i++) {

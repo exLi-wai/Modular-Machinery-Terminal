@@ -12,6 +12,7 @@ gui.modular_machinery_terminal.formed=已成型
 gui.modular_machinery_terminal.running=正在运行
 gui.modular_machinery_terminal.threads=线程
 gui.modular_machinery_terminal.parallelism=并行
+gui.modular_machinery_terminal.energy=能耗
 gui.modular_machinery_terminal.output=产出
 gui.modular_machinery_terminal.reason=状态
 gui.modular_machinery_terminal.thread_outputs=运行中的线程数
