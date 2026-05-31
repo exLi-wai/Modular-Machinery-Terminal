@@ -12,7 +12,7 @@ import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineContr
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
-import net.minecraft.network.play.server.SPacketBlockChange;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.network.play.server.SPacketChunkData;
 import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
@@ -20,6 +20,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
@@ -147,14 +148,32 @@ public class PacketOpenMachineComponentGui implements IMessage {
                 Chunk chunk = world.getChunk(pos);
                 player.connection.sendPacket(new SPacketChunkData(chunk, 65535));
             } else {
-                // Cross-dimension: SPacketChunkData cannot be used because the
-                // server writes sky light data based on the source dimension's
-                // hasSkyLight(), but the client reads based on its current
-                // dimension's hasSkyLight(). When these differ the buffer
-                // desynchronises and the chunk data is corrupted.
-                // Use SPacketBlockChange which only syncs the block state at
-                // the target position, avoiding the sky light issue entirely.
-                player.connection.sendPacket(new SPacketBlockChange(world, pos));
+                // Cross-dimension: we cannot send the real chunk because
+                // SPacketChunkData encodes sky light based on the source
+                // world's hasSkyLight(), while the client decodes based on
+                // its own world's hasSkyLight(). A mismatch corrupts the
+                // entire buffer. SPacketBlockChange also fails because the
+                // client may not have the target chunk loaded at all.
+                //
+                // Solution: build a minimal fake chunk belonging to the
+                // PLAYER's world (so sky light matches) that contains only
+                // the target block and its tile entity data.
+                WorldServer playerWorld = player.getServerWorld();
+                Chunk fakeChunk = new Chunk(playerWorld, pos.getX() >> 4, pos.getZ() >> 4);
+                IBlockState targetState = world.getBlockState(pos);
+                int sectionIndex = pos.getY() >> 4;
+                ExtendedBlockStorage[] storage = fakeChunk.getBlockStorageArray();
+                storage[sectionIndex] = new ExtendedBlockStorage(
+                        sectionIndex << 4, playerWorld.provider.hasSkyLight());
+                storage[sectionIndex].set(
+                        pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15, targetState);
+                // Include the TE in the chunk so handleChunkData creates it
+                // on the client and populates its data via handleUpdateTag.
+                TileEntity targetTe = world.getTileEntity(pos);
+                if (targetTe != null) {
+                    fakeChunk.getTileEntityMap().put(pos, targetTe);
+                }
+                player.connection.sendPacket(new SPacketChunkData(fakeChunk, 65535));
             }
             TileEntity tile = world.getTileEntity(pos);
             if (tile != null) {
