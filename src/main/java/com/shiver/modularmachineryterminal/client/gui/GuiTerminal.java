@@ -55,7 +55,7 @@ public class GuiTerminal extends GuiScreen {
 
     private GuiTextField searchField;
     private GuiTextField smartValueField;
-    private MachineKey selected;
+    private static MachineKey selected;
     private SortMode sortMode = SortMode.NAME;
     private boolean descending;
     private int scroll;
@@ -278,9 +278,9 @@ public class GuiTerminal extends GuiScreen {
 
     private String actionButtonText(int index, MachineInfo machine) {
         if (index == 0) {
-            return machine != null && pinnedMachines.contains(machine.key) ? "*" : "^";
+            return "↑";
         }
-        return index == 1 ? "T" : "D";
+        return index == 1 ? "T" : "M";
     }
 
     private void drawActionTooltip(int left, int top, int mouseX, int mouseY) {
@@ -311,7 +311,8 @@ public class GuiTerminal extends GuiScreen {
             MachineInfo machine = visible.get(scroll + i);
             int y = listY + i * ROW_HEIGHT;
             boolean isSelected = selected != null && selected.equals(machine.key);
-            int bg = isSelected ? 0xFF314B5A : 0xFF22272D;
+            boolean isPinned = pinnedMachines.contains(machine.key);
+            int bg = isSelected ? 0xFF314B5A : (isPinned ? 0xFF3D3A28 : 0xFF22272D);
             drawRect(listX, y, listX + LIST_ROW_WIDTH, y + ROW_HEIGHT - 2, bg);
             drawStatusLamp(listX + 4, y + 4, machine);
             drawItem(machine.controllerIcon, listX + 12, y + 3, !machine.loaded);
@@ -811,15 +812,15 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private int actionButtonX(int left) {
-        return left + GUI_LAYOUT_WIDTH + (GUI_EXTRA_RIGHT_WIDTH - actionButtonSize()) / 2;
+        return left + GUI_LAYOUT_WIDTH - 6;
     }
 
     private int actionButtonY(int top, int index) {
-        return top + CONTENT_TOP + 4 + index * (actionButtonSize() + 3);
+        return top + CONTENT_TOP + index * (actionButtonSize() + 4);
     }
 
     private int actionButtonSize() {
-        return GUI_EXTRA_RIGHT_WIDTH - 2;
+        return 12;
     }
 
     private int smartEditorX(int left) {
