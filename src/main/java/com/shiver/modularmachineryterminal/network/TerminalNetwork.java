@@ -17,6 +17,8 @@ public final class TerminalNetwork {
         CHANNEL.registerMessage(PacketRequestFullList.Handler.class, PacketRequestFullList.class, id++, Side.SERVER);
         CHANNEL.registerMessage(PacketFullList.Handler.class, PacketFullList.class, id++, Side.CLIENT);
         CHANNEL.registerMessage(PacketRequestDynamic.Handler.class, PacketRequestDynamic.class, id++, Side.SERVER);
-        CHANNEL.registerMessage(PacketDynamic.Handler.class, PacketDynamic.class, id, Side.CLIENT);
+        CHANNEL.registerMessage(PacketDynamic.Handler.class, PacketDynamic.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(PacketTeleportToMachine.Handler.class, PacketTeleportToMachine.class, id++, Side.SERVER);
+        CHANNEL.registerMessage(PacketUpdateSmartInterface.Handler.class, PacketUpdateSmartInterface.class, id, Side.SERVER);
     }
 }

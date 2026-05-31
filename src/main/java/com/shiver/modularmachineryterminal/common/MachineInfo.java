@@ -22,6 +22,7 @@ public class MachineInfo {
     public long energyPerTick;
     public OutputInfo output = OutputInfo.none();
     public final List<ThreadInfo> threads = new ArrayList<>();
+    public final List<SmartInterfaceInfo> smartInterfaces = new ArrayList<>();
 
     public MachineInfo copyBasic() {
         MachineInfo copy = new MachineInfo();
@@ -38,6 +39,7 @@ public class MachineInfo {
         copy.maxParallelism = maxParallelism;
         copy.energyPerTick = energyPerTick;
         copy.output = output;
+        copy.smartInterfaces.addAll(smartInterfaces);
         return copy;
     }
 
@@ -58,6 +60,10 @@ public class MachineInfo {
         buffer.writeInt(threads.size());
         for (ThreadInfo thread : threads) {
             thread.write(buffer);
+        }
+        buffer.writeInt(smartInterfaces.size());
+        for (SmartInterfaceInfo smartInterface : smartInterfaces) {
+            smartInterface.write(buffer);
         }
     }
 
@@ -83,6 +89,10 @@ public class MachineInfo {
         int count = buffer.readInt();
         for (int i = 0; i < count; i++) {
             info.threads.add(ThreadInfo.read(buffer));
+        }
+        int smartInterfaceCount = buffer.readInt();
+        for (int i = 0; i < smartInterfaceCount; i++) {
+            info.smartInterfaces.add(SmartInterfaceInfo.read(buffer));
         }
         return info;
     }

@@ -4,10 +4,13 @@ import com.shiver.modularmachineryterminal.client.ClientTerminalData;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import com.shiver.modularmachineryterminal.common.OutputInfo;
+import com.shiver.modularmachineryterminal.common.SmartInterfaceInfo;
 import com.shiver.modularmachineryterminal.common.SummaryInfo;
 import com.shiver.modularmachineryterminal.common.ThreadInfo;
 import com.shiver.modularmachineryterminal.network.PacketRequestDynamic;
 import com.shiver.modularmachineryterminal.network.PacketRequestFullList;
+import com.shiver.modularmachineryterminal.network.PacketTeleportToMachine;
+import com.shiver.modularmachineryterminal.network.PacketUpdateSmartInterface;
 import com.shiver.modularmachineryterminal.network.TerminalNetwork;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.GuiTextField;
@@ -19,19 +22,29 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fml.common.Loader;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class GuiTerminal extends GuiScreen {
 
-    private static final int GUI_WIDTH = 292;
+    private static final int GUI_LAYOUT_WIDTH = 292;
+    private static final int GUI_EXTRA_RIGHT_WIDTH = 12;
+    private static final int GUI_WIDTH = GUI_LAYOUT_WIDTH + GUI_EXTRA_RIGHT_WIDTH;
     private static final int GUI_HEIGHT = 212;
     private static final int LIST_WIDTH = 126;
     private static final int ROW_HEIGHT = 24;
@@ -41,11 +54,15 @@ public class GuiTerminal extends GuiScreen {
     private static final Method JEC_CONTAINS = findJecContains();
 
     private GuiTextField searchField;
+    private GuiTextField smartValueField;
     private MachineKey selected;
     private SortMode sortMode = SortMode.NAME;
     private boolean descending;
     private int scroll;
     private int threadScroll;
+    private int smartPage;
+    private boolean smartEditorOpen;
+    private final Set<MachineKey> pinnedMachines = new HashSet<>();
 
     @Override
     public void initGui() {
@@ -54,6 +71,7 @@ public class GuiTerminal extends GuiScreen {
         int top = guiTop();
         searchField = new GuiTextField(0, fontRenderer, left + 8, top + 32, 76, 14);
         searchField.setMaxStringLength(40);
+        loadPinnedMachines();
         buttonList.clear();
         TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList());
     }
@@ -89,6 +107,9 @@ public class GuiTerminal extends GuiScreen {
         drawControls(left, top, mouseX, mouseY);
         drawMachineList(left, top, mouseX, mouseY);
         drawDetails(left, top, mouseX, mouseY);
+        drawActionButtons(left, top, mouseX, mouseY);
+        drawSmartEditor(left, top, mouseX, mouseY);
+        drawActionTooltip(left, top, mouseX, mouseY);
     }
 
     @Override
@@ -96,6 +117,27 @@ public class GuiTerminal extends GuiScreen {
         searchField.mouseClicked(mouseX, mouseY, mouseButton);
         int left = guiLeft();
         int top = guiTop();
+        MachineInfo machine = selectedMachine();
+
+        if (smartEditorOpen && handleSmartEditorClick(left, top, mouseX, mouseY)) {
+            return;
+        }
+
+        if (machine != null && mouseButton == 0) {
+            if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, 0), actionButtonSize(), actionButtonSize())) {
+                togglePinned(machine.key);
+                scroll = 0;
+                return;
+            }
+            if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, 1), actionButtonSize(), actionButtonSize())) {
+                TerminalNetwork.CHANNEL.sendToServer(new PacketTeleportToMachine(machine.key));
+                return;
+            }
+            if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, 2), actionButtonSize(), actionButtonSize())) {
+                openSmartEditor(machine);
+                return;
+            }
+        }
 
         if (inside(mouseX, mouseY, sortX(left), top + 32, 64, 14)) {
             sortMode = sortMode.next();
@@ -124,6 +166,14 @@ public class GuiTerminal extends GuiScreen {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        if (smartEditorOpen && smartValueField != null && smartValueField.textboxKeyTyped(typedChar, keyCode)) {
+            return;
+        }
+        if (smartEditorOpen && keyCode == Keyboard.KEY_ESCAPE) {
+            smartEditorOpen = false;
+            smartValueField = null;
+            return;
+        }
         if (searchField.textboxKeyTyped(typedChar, keyCode)) {
             scroll = 0;
             return;
@@ -164,7 +214,7 @@ public class GuiTerminal extends GuiScreen {
         drawRect(left, top, left + GUI_WIDTH, top + GUI_HEIGHT, 0xEE1C2024);
         drawRect(left + 3, top + 3, left + GUI_WIDTH - 3, top + GUI_HEIGHT - 3, 0xFF2B3036);
         drawRect(left + 6, top + CONTENT_TOP, left + LIST_WIDTH + 12, top + GUI_HEIGHT - 8, 0xFF14181C);
-        drawRect(left + LIST_WIDTH + 16, top + CONTENT_TOP, left + GUI_WIDTH - 8, top + GUI_HEIGHT - 8, 0xFF14181C);
+        drawRect(left + LIST_WIDTH + 16, top + CONTENT_TOP, left + GUI_LAYOUT_WIDTH - 8, top + GUI_HEIGHT - 8, 0xFF14181C);
         drawRect(left + 6, top + 28, legendX(left) - 8, top + 30, 0xFF4A545F);
     }
 
@@ -207,6 +257,49 @@ public class GuiTerminal extends GuiScreen {
         drawRect(x, y, x + width, y + height, border);
         drawRect(x + 1, y + 1, x + width - 1, y + height - 1, fill);
         fontRenderer.drawString(trim(text, width - 6), x + 3, y + 3, 0xFFD8DEE5);
+    }
+
+    private void drawActionButtons(int left, int top, int mouseX, int mouseY) {
+        MachineInfo machine = selectedMachine();
+        int x = actionButtonX(left);
+        for (int i = 0; i < 3; i++) {
+            boolean hovered = inside(mouseX, mouseY, x, actionButtonY(top, i), actionButtonSize(), actionButtonSize());
+            drawIconButton(x, actionButtonY(top, i), actionButtonSize(), actionButtonSize(), actionButtonText(i, machine), hovered);
+        }
+    }
+
+    private void drawIconButton(int x, int y, int width, int height, String text, boolean hovered) {
+        int border = hovered ? 0xFF8DA5B8 : 0xFF5E6973;
+        int fill = hovered ? 0xFF394650 : 0xFF273039;
+        drawRect(x, y, x + width, y + height, border);
+        drawRect(x + 1, y + 1, x + width - 1, y + height - 1, fill);
+        fontRenderer.drawString(text, x + (width - fontRenderer.getStringWidth(text)) / 2, y + 2, 0xFFD8DEE5);
+    }
+
+    private String actionButtonText(int index, MachineInfo machine) {
+        if (index == 0) {
+            return machine != null && pinnedMachines.contains(machine.key) ? "*" : "^";
+        }
+        return index == 1 ? "T" : "D";
+    }
+
+    private void drawActionTooltip(int left, int top, int mouseX, int mouseY) {
+        for (int i = 0; i < 3; i++) {
+            if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, i), actionButtonSize(), actionButtonSize())) {
+                drawHoveringText(I18n.format(actionTooltipKey(i)), mouseX, mouseY);
+                return;
+            }
+        }
+    }
+
+    private String actionTooltipKey(int index) {
+        if (index == 0) {
+            return "gui.modular_machinery_terminal.pin_current";
+        }
+        if (index == 1) {
+            return "gui.modular_machinery_terminal.teleport_front";
+        }
+        return "gui.modular_machinery_terminal.edit_smart_interface";
     }
 
     private void drawMachineList(int left, int top, int mouseX, int mouseY) {
@@ -303,6 +396,101 @@ public class GuiTerminal extends GuiScreen {
         drawScrollbar(x + DETAIL_WIDTH, y, 3, rows * ROW_HEIGHT - 2, machine.threads.size(), rows, threadScroll);
         if (tooltip != null) {
             drawHoveringText(tooltip, mouseX, mouseY);
+        }
+    }
+
+    private void drawSmartEditor(int left, int top, int mouseX, int mouseY) {
+        if (!smartEditorOpen) {
+            return;
+        }
+        MachineInfo machine = selectedMachine();
+        int x = smartEditorX(left);
+        int y = smartEditorY(top);
+        drawRect(x, y, x + 118, y + 82, 0xEE101419);
+        drawRect(x + 2, y + 2, x + 116, y + 80, 0xFF273039);
+        fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.smart_title"), x + 6, y + 6, 0xFFD8DEE5);
+        if (machine == null || machine.smartInterfaces.isEmpty()) {
+            fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.no_smart_interface"), x + 6, y + 25, 0xFF9EA8B2);
+            return;
+        }
+        if (smartPage >= machine.smartInterfaces.size()) {
+            smartPage = machine.smartInterfaces.size() - 1;
+        }
+        SmartInterfaceInfo info = machine.smartInterfaces.get(smartPage);
+        fontRenderer.drawString(trim(info.type, 104), x + 6, y + 20, 0xFFE2E7EA);
+        fontRenderer.drawString("Dim" + machine.key.dimension + " " + info.interfacePos.getX() + "," + info.interfacePos.getY() + "," + info.interfacePos.getZ(), x + 6, y + 31, 0xFF9EA8B2);
+        if (smartValueField != null) {
+            smartValueField.drawTextBox();
+        }
+        String page = (smartPage + 1) + "/" + machine.smartInterfaces.size();
+        fontRenderer.drawString(page, x + 58 - fontRenderer.getStringWidth(page) / 2, y + 66, 0xFFBFC7CF);
+        drawIconButton(x + 6, y + 62, 20, 12, "<", inside(mouseX, mouseY, x + 6, y + 62, 20, 12));
+        drawIconButton(x + 92, y + 62, 20, 12, ">", inside(mouseX, mouseY, x + 92, y + 62, 20, 12));
+        drawIconButton(x + 68, y + 45, 44, 12, I18n.format("gui.modular_machinery_terminal.save"), inside(mouseX, mouseY, x + 68, y + 45, 44, 12));
+    }
+
+    private boolean handleSmartEditorClick(int left, int top, int mouseX, int mouseY) {
+        MachineInfo machine = selectedMachine();
+        int x = smartEditorX(left);
+        int y = smartEditorY(top);
+        if (smartValueField != null) {
+            smartValueField.mouseClicked(mouseX, mouseY, 0);
+        }
+        if (machine == null || machine.smartInterfaces.isEmpty()) {
+            if (!inside(mouseX, mouseY, x, y, 118, 82)) {
+                smartEditorOpen = false;
+            }
+            return inside(mouseX, mouseY, x, y, 118, 82);
+        }
+        if (inside(mouseX, mouseY, x + 6, y + 62, 20, 12)) {
+            setSmartPage(machine, smartPage <= 0 ? machine.smartInterfaces.size() - 1 : smartPage - 1);
+            return true;
+        }
+        if (inside(mouseX, mouseY, x + 92, y + 62, 20, 12)) {
+            setSmartPage(machine, smartPage + 1 >= machine.smartInterfaces.size() ? 0 : smartPage + 1);
+            return true;
+        }
+        if (inside(mouseX, mouseY, x + 68, y + 45, 44, 12)) {
+            saveSmartValue(machine);
+            return true;
+        }
+        if (!inside(mouseX, mouseY, x, y, 118, 82)) {
+            smartEditorOpen = false;
+            smartValueField = null;
+            return false;
+        }
+        return true;
+    }
+
+    private void openSmartEditor(MachineInfo machine) {
+        smartEditorOpen = true;
+        setSmartPage(machine, 0);
+    }
+
+    private void setSmartPage(MachineInfo machine, int page) {
+        smartPage = page;
+        int left = guiLeft();
+        int top = guiTop();
+        smartValueField = new GuiTextField(1, fontRenderer, smartEditorX(left) + 6, smartEditorY(top) + 45, 58, 12);
+        smartValueField.setMaxStringLength(16);
+        if (machine != null && !machine.smartInterfaces.isEmpty()) {
+            SmartInterfaceInfo info = machine.smartInterfaces.get(smartPage);
+            smartValueField.setText(Float.toString(info.value));
+            smartValueField.setFocused(true);
+        }
+    }
+
+    private void saveSmartValue(MachineInfo machine) {
+        if (smartValueField == null || machine == null || machine.smartInterfaces.isEmpty()) {
+            return;
+        }
+        try {
+            float value = Float.parseFloat(smartValueField.getText());
+            SmartInterfaceInfo info = machine.smartInterfaces.get(smartPage);
+            info.value = value;
+            TerminalNetwork.CHANNEL.sendToServer(new PacketUpdateSmartInterface(machine.key, info.interfacePos, info.dataIndex, value));
+            TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys()));
+        } catch (NumberFormatException ignored) {
         }
     }
 
@@ -414,7 +602,10 @@ public class GuiTerminal extends GuiScreen {
         if (descending) {
             comparator = comparator.reversed();
         }
-        machines.sort(comparator.thenComparing(machine -> machine.name));
+        machines.sort(Comparator
+                .comparing((MachineInfo machine) -> !pinnedMachines.contains(machine.key))
+                .thenComparing(comparator)
+                .thenComparing(machine -> machine.name));
         return machines;
     }
 
@@ -508,8 +699,71 @@ public class GuiTerminal extends GuiScreen {
         return I18n.format(descending ? "gui.modular_machinery_terminal.desc" : "gui.modular_machinery_terminal.asc");
     }
 
+    private void togglePinned(MachineKey key) {
+        if (pinnedMachines.contains(key)) {
+            pinnedMachines.remove(key);
+        } else {
+            pinnedMachines.add(key);
+        }
+        savePinnedMachines();
+    }
+
+    private void loadPinnedMachines() {
+        pinnedMachines.clear();
+        File file = pinsFile();
+        if (!file.isFile()) {
+            return;
+        }
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                MachineKey key = parseKey(line.trim());
+                if (key != null) {
+                    pinnedMachines.add(key);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void savePinnedMachines() {
+        File file = pinsFile();
+        File parent = file.getParentFile();
+        if (parent != null && !parent.isDirectory()) {
+            parent.mkdirs();
+        }
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            for (MachineKey key : pinnedMachines) {
+                BlockPos pos = key.pos;
+                writer.write(key.dimension + ":" + pos.getX() + ":" + pos.getY() + ":" + pos.getZ());
+                writer.newLine();
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private MachineKey parseKey(String text) {
+        String[] parts = text.split(":");
+        if (parts.length != 4) {
+            return null;
+        }
+        try {
+            return new MachineKey(Integer.parseInt(parts[0]), new BlockPos(
+                    Integer.parseInt(parts[1]),
+                    Integer.parseInt(parts[2]),
+                    Integer.parseInt(parts[3])
+            ));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private File pinsFile() {
+        return new File(Loader.instance().getConfigDir(), "modularmachinery_terminal_pins.txt");
+    }
+
     private int guiLeft() {
-        return (width - GUI_WIDTH) / 2;
+        return (width - GUI_LAYOUT_WIDTH) / 2;
     }
 
     private int guiTop() {
@@ -529,7 +783,7 @@ public class GuiTerminal extends GuiScreen {
         int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
         int left = guiLeft();
         int top = guiTop();
-        return inside(mouseX, mouseY, left + LIST_WIDTH + 16, top + CONTENT_TOP, GUI_WIDTH - LIST_WIDTH - 24, GUI_HEIGHT - CONTENT_TOP - 8);
+        return inside(mouseX, mouseY, left + LIST_WIDTH + 16, top + CONTENT_TOP, GUI_LAYOUT_WIDTH - LIST_WIDTH - 24, GUI_HEIGHT - CONTENT_TOP - 8);
     }
 
     private int threadStartY() {
@@ -554,6 +808,26 @@ public class GuiTerminal extends GuiScreen {
 
     private int legendX(int left) {
         return left + GUI_WIDTH - 40;
+    }
+
+    private int actionButtonX(int left) {
+        return left + GUI_LAYOUT_WIDTH + (GUI_EXTRA_RIGHT_WIDTH - actionButtonSize()) / 2;
+    }
+
+    private int actionButtonY(int top, int index) {
+        return top + CONTENT_TOP + 4 + index * (actionButtonSize() + 3);
+    }
+
+    private int actionButtonSize() {
+        return GUI_EXTRA_RIGHT_WIDTH - 2;
+    }
+
+    private int smartEditorX(int left) {
+        return left + GUI_WIDTH + 4;
+    }
+
+    private int smartEditorY(int top) {
+        return top + CONTENT_TOP;
     }
 
     @Override

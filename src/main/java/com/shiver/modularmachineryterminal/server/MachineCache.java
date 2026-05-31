@@ -3,6 +3,7 @@ package com.shiver.modularmachineryterminal.server;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import com.shiver.modularmachineryterminal.common.OutputInfo;
+import com.shiver.modularmachineryterminal.common.SmartInterfaceInfo;
 import com.shiver.modularmachineryterminal.common.SummaryInfo;
 import com.shiver.modularmachineryterminal.common.ThreadInfo;
 import com.shiver.modularmachineryterminal.network.PacketDynamic;
@@ -24,7 +25,9 @@ import hellfirepvp.modularmachinery.common.machine.RecipeThread;
 import hellfirepvp.modularmachinery.common.modifier.RecipeModifier;
 import hellfirepvp.modularmachinery.common.tiles.TileFactoryController;
 import hellfirepvp.modularmachinery.common.tiles.TileMachineController;
+import hellfirepvp.modularmachinery.common.tiles.TileSmartInterface;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
+import hellfirepvp.modularmachinery.common.util.SmartInterfaceData;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
@@ -252,7 +255,46 @@ public class MachineCache {
         if (info.output.type == OutputInfo.Type.NONE && controller.getActiveRecipe() != null) {
             info.output = firstOutput(controller.getActiveRecipe());
         }
+        captureSmartInterfaces(controller, info);
         return info;
+    }
+
+    private static void captureSmartInterfaces(TileMultiblockMachineController controller, MachineInfo info) {
+        Map<TileSmartInterface.SmartInterfaceProvider, String> smartInterfaces = controller.getFoundSmartInterfaces();
+        if (smartInterfaces == null || smartInterfaces.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<TileSmartInterface.SmartInterfaceProvider, String> entry : smartInterfaces.entrySet()) {
+            TileSmartInterface.SmartInterfaceProvider provider = entry.getKey();
+            TileSmartInterface smartInterface = smartInterfaceTile(provider);
+            if (provider == null || smartInterface == null) {
+                continue;
+            }
+            for (int i = 0; i < provider.getBoundSize(); i++) {
+                SmartInterfaceData data = provider.getMachineData(i);
+                if (data == null || !controller.getPos().equals(data.getPos())) {
+                    continue;
+                }
+                SmartInterfaceInfo smartInfo = new SmartInterfaceInfo();
+                smartInfo.interfacePos = smartInterface.getPos();
+                smartInfo.dataIndex = i;
+                smartInfo.type = data.getType();
+                smartInfo.parentMachineName = data.getParentMachineName();
+                smartInfo.value = data.getValue();
+                info.smartInterfaces.add(smartInfo);
+            }
+        }
+    }
+
+    private static TileSmartInterface smartInterfaceTile(TileSmartInterface.SmartInterfaceProvider provider) {
+        try {
+            Field parent = provider.getClass().getDeclaredField("parent");
+            parent.setAccessible(true);
+            Object tile = parent.get(provider);
+            return tile instanceof TileSmartInterface ? (TileSmartInterface) tile : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static ThreadInfo captureThread(int index, RecipeThread thread) {
