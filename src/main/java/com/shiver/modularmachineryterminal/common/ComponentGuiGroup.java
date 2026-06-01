@@ -1,10 +1,12 @@
 package com.shiver.modularmachineryterminal.common;
 
 public enum ComponentGuiGroup {
+    CONTROLLER,
     INPUT,
     OUTPUT,
     PATTERN,
-    UPGRADE;
+    UPGRADE,
+    SMART_INTERFACE;
 
     public static ComponentGuiGroup byId(int id) {
         ComponentGuiGroup[] values = values();

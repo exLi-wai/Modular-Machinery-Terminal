@@ -7,6 +7,7 @@ import hellfirepvp.modularmachinery.common.tiles.TileFluidInputHatch;
 import hellfirepvp.modularmachinery.common.tiles.TileFluidOutputHatch;
 import hellfirepvp.modularmachinery.common.tiles.TileItemInputBus;
 import hellfirepvp.modularmachinery.common.tiles.TileItemOutputBus;
+import hellfirepvp.modularmachinery.common.tiles.TileSmartInterface;
 import hellfirepvp.modularmachinery.common.tiles.TileUpgradeBus;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import io.netty.buffer.ByteBuf;
@@ -17,7 +18,7 @@ import net.minecraft.network.play.server.SPacketChunkData;
 import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
@@ -91,7 +92,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
             TileEntity tile = world.getTileEntity(message.key.pos);
             if (!(tile instanceof TileMultiblockMachineController)) {
-                player.sendMessage(new TextComponentString("Machine controller not found."));
+                player.sendMessage(new TextComponentTranslation("message.modular_machinery_terminal.machine_controller_not_found"));
                 return;
             }
             TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
@@ -101,7 +102,9 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
             List<TargetGui> targets = targets(controller, message.group);
             if (targets.isEmpty()) {
-                player.sendMessage(new TextComponentString("No GUI found for " + message.group.name().toLowerCase() + "."));
+                player.sendMessage(new TextComponentTranslation(
+                        "message.modular_machinery_terminal.no_gui_found",
+                        new TextComponentTranslation(groupTranslationKey(message.group))));
                 return;
             }
             int index = wrap(message.index, targets.size());
@@ -184,6 +187,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
 
         private static List<TargetGui> targets(TileMultiblockMachineController controller, ComponentGuiGroup group) {
             Map<BlockPos, TargetGui> targets = new LinkedHashMap<>();
+            addTarget(targets, controller, group);
             Map<TileEntity, ProcessingComponent<?>> components = controller.getGeneralComponents();
             if (components != null) {
                 for (TileEntity tile : components.keySet()) {
@@ -193,6 +197,11 @@ public class PacketOpenMachineComponentGui implements IMessage {
             if (group == ComponentGuiGroup.UPGRADE && controller.getFoundUpgradeBuses() != null) {
                 for (TileUpgradeBus.UpgradeBusProvider provider : controller.getFoundUpgradeBuses()) {
                     addTarget(targets, upgradeBusTile(provider), group);
+                }
+            }
+            if (group == ComponentGuiGroup.SMART_INTERFACE && controller.getFoundSmartInterfaces() != null) {
+                for (TileSmartInterface.SmartInterfaceProvider provider : controller.getFoundSmartInterfaces().keySet()) {
+                    addTarget(targets, smartInterfaceTile(provider), group);
                 }
             }
             List<TargetGui> list = new ArrayList<>(targets.values());
@@ -211,7 +220,10 @@ public class PacketOpenMachineComponentGui implements IMessage {
         }
 
         private static int guiId(TileEntity tile, ComponentGuiGroup group) {
-            if (group == ComponentGuiGroup.INPUT) {
+            if (group == ComponentGuiGroup.CONTROLLER) {
+                if (isType(tile, "hellfirepvp.modularmachinery.common.tiles.TileFactoryController")) return guiId("FACTORY");
+                if (isType(tile, "hellfirepvp.modularmachinery.common.tiles.TileMachineController")) return guiId("CONTROLLER");
+            } else if (group == ComponentGuiGroup.INPUT) {
                 if (tile instanceof TileItemInputBus) return guiId("BUS_INVENTORY");
                 if (tile instanceof TileFluidInputHatch) return guiId("TANK_INVENTORY");
                 if (isType(tile, "github.kasuminova.mmce.common.tile.MEItemInputBus")) return guiId("ME_ITEM_INPUT_BUS");
@@ -227,6 +239,8 @@ public class PacketOpenMachineComponentGui implements IMessage {
                 if (isType(tile, "github.kasuminova.mmce.common.tile.MEPatternProvider")) return guiId("ME_PATTERN_PROVIDER");
             } else if (group == ComponentGuiGroup.UPGRADE) {
                 if (tile instanceof TileUpgradeBus) return guiId("UPGRADE_BUS");
+            } else if (group == ComponentGuiGroup.SMART_INTERFACE) {
+                if (tile instanceof TileSmartInterface) return guiId("SMART_INTERFACE");
             }
             return -1;
         }
@@ -267,12 +281,27 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
         }
 
+        private static String groupTranslationKey(ComponentGuiGroup group) {
+            return "message.modular_machinery_terminal.gui_group." + group.name().toLowerCase();
+        }
+
         private static TileUpgradeBus upgradeBusTile(TileUpgradeBus.UpgradeBusProvider provider) {
             try {
                 Field parent = provider.getClass().getDeclaredField("parent");
                 parent.setAccessible(true);
                 Object tile = parent.get(provider);
                 return tile instanceof TileUpgradeBus ? (TileUpgradeBus) tile : null;
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
+        private static TileSmartInterface smartInterfaceTile(TileSmartInterface.SmartInterfaceProvider provider) {
+            try {
+                Field parent = provider.getClass().getDeclaredField("parent");
+                parent.setAccessible(true);
+                Object tile = parent.get(provider);
+                return tile instanceof TileSmartInterface ? (TileSmartInterface) tile : null;
             } catch (Exception ignored) {
                 return null;
             }
