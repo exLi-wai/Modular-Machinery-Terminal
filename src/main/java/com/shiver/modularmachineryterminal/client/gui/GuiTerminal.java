@@ -286,9 +286,9 @@ public class GuiTerminal extends GuiScreen {
         if (index == 2) return "C";
         if (index == 3) return "I";
         if (index == 4) return "O";
-        if (index == 5) return "S";
+        if (index == 5) return "M";
         if (index == 6) return "U";
-        if (index == 7) return "M";
+        if (index == 7) return "S";
         return "";
     }
 
