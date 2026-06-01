@@ -10,7 +10,6 @@ import com.shiver.modularmachineryterminal.common.ThreadInfo;
 import com.shiver.modularmachineryterminal.network.PacketDynamic;
 import com.shiver.modularmachineryterminal.network.PacketFullList;
 import github.kasuminova.mmce.common.event.machine.MachineTickEvent;
-import hellfirepvp.modularmachinery.common.block.BlockController;
 import hellfirepvp.modularmachinery.common.crafting.ActiveMachineRecipe;
 import hellfirepvp.modularmachinery.common.crafting.MachineRecipe;
 import hellfirepvp.modularmachinery.common.crafting.helper.ComponentRequirement;
@@ -35,7 +34,9 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.translation.I18n;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.common.util.BlockSnapshot;
@@ -248,9 +249,6 @@ public class MachineCache {
             return;
         }
         TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
-        if (controller.getWorld() == null) {
-            return;
-        }
         MachineKey key = new MachineKey(controller.getWorld().provider.getDimension(), controller.getPos());
         if (update(controller, true)) {
             if (foundLoaded != null) {
@@ -273,9 +271,6 @@ public class MachineCache {
 
     private static boolean isCachedPositionLoaded(MinecraftServer server, MachineKey key) {
         WorldServer world = server.getWorld(key.dimension);
-        if (world == null) {
-            return false;
-        }
         int chunkX = key.pos.getX() >> 4;
         int chunkZ = key.pos.getZ() >> 4;
         return world.getChunkProvider().getLoadedChunk(chunkX, chunkZ) != null;
@@ -526,13 +521,16 @@ public class MachineCache {
             machine = ((TileMachineController) controller).getParentMachine();
         }
         if (machine != null) {
-            String localized = machine.getLocalizedName();
+            String localized = machine.getOriginalLocalizedName();
             if (localized != null && !localized.isEmpty()) {
                 return localized;
             }
-            if (machine.getRegistryName() != null) {
-                return machine.getRegistryName().toString();
+            ResourceLocation rl = machine.getRegistryName();
+            String key = rl.getNamespace() + "." + rl.getPath();
+            if (I18n.canTranslate(key)) {
+                return I18n.translateToLocal(key);
             }
+            return rl.toString();
         }
         String formedName = controller.getFormedMachineName();
         return formedName == null || formedName.isEmpty() ? "Unknown Machine" : formedName;
@@ -541,17 +539,7 @@ public class MachineCache {
     private static ItemStack controllerIcon(TileMultiblockMachineController controller) {
         Block block = controller.getWorld().getBlockState(controller.getPos()).getBlock();
         Item item = Item.getItemFromBlock(block);
-        if (item != null) {
-            return new ItemStack(item, 1, block.damageDropped(controller.getWorld().getBlockState(controller.getPos())));
-        }
-        DynamicMachine machine = controller.getFoundMachine();
-        if (machine != null) {
-            BlockController blockController = BlockController.getControllerWithMachine(machine);
-            if (blockController != null) {
-                return new ItemStack(blockController);
-            }
-        }
-        return ItemStack.EMPTY;
+        return new ItemStack(item, 1, block.damageDropped(controller.getWorld().getBlockState(controller.getPos())));
     }
 
     private static String statusText(CraftingStatus status) {
