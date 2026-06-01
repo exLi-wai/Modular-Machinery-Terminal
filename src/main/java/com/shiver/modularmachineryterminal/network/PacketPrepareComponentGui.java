@@ -79,7 +79,7 @@ public class PacketPrepareComponentGui implements IMessage {
             }
             TileEntity tile = mc.world.getTileEntity(message.targetPos);
             if (tile != null) {
-                ComponentGuiPager.set(message.key, message.group, message.index, message.total);
+                ComponentGuiPager.set(message.key, message.group, message.index, message.total, message.targetPos);
                 TerminalNetwork.CHANNEL.sendToServer(new PacketOpenMachineComponentGui(message.key, message.group, message.index, true));
                 return;
             }

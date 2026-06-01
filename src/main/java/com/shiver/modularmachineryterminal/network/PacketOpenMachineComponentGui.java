@@ -113,7 +113,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
                 TerminalNetwork.CHANNEL.sendTo(new PacketPrepareComponentGui(message.key, message.group, index, targets.size(), target.pos), player);
                 return;
             }
-            TerminalNetwork.CHANNEL.sendTo(new PacketComponentGuiPager(message.key, message.group, index, targets.size()), player);
+            TerminalNetwork.CHANNEL.sendTo(new PacketComponentGuiPager(message.key, message.group, index, targets.size(), target.pos), player);
             // Temporarily move the player to the target block so that
             // Container.canInteractWith distance checks pass for remote GUIs.
             double origX = player.posX;

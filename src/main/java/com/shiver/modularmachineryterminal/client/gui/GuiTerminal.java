@@ -253,7 +253,7 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private void drawLegend(int left, int top) {
-        int x = legendX(left);
+        int x = legendX(left) + 2;
         int y = top + 9;
         drawLegendItem(x, y, 0xFF43E06D, I18n.format("gui.modular_machinery_terminal.legend.running"));
         drawLegendItem(x, y + 9, 0xFFE2C84A, I18n.format("gui.modular_machinery_terminal.legend.idle"));
