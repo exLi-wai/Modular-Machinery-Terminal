@@ -614,7 +614,13 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private String formatEnergy(long energyPerTick) {
-        return energyPerTick <= 0 ? "0 RF/t" : energyPerTick + " RF/t";
+        if (energyPerTick > 0) {
+            return "+" + energyPerTick + " RF/t";
+        }
+        if (energyPerTick < 0) {
+            return energyPerTick + " RF/t";
+        }
+        return "0 RF/t";
     }
 
     private String sortLabel() {

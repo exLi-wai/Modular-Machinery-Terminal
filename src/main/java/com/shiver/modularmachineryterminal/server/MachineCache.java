@@ -239,7 +239,7 @@ public class MachineCache {
                 if (threadInfo.working) {
                     info.activeThreads++;
                 }
-                info.energyPerTick += energyPerTick(thread);
+                info.energyPerTick += energyFlowPerTick(thread);
                 info.parallelism += threadInfo.parallelism;
                 info.maxParallelism += threadInfo.maxParallelism;
                 if (info.output.type == OutputInfo.Type.NONE && threadInfo.output.type != OutputInfo.Type.NONE) {
@@ -396,7 +396,7 @@ public class MachineCache {
         return Math.max(0, Math.min(100, tick * 100 / totalTick));
     }
 
-    private static long energyPerTick(RecipeThread thread) {
+    private static long energyFlowPerTick(RecipeThread thread) {
         if (thread == null || thread.getActiveRecipe() == null) {
             return 0;
         }
@@ -404,11 +404,21 @@ public class MachineCache {
         if (context == null) {
             return 0;
         }
-        List<ComponentRequirement<?, ?>> requirements = context.getRequirementBy(RequirementTypesMM.REQUIREMENT_ENERGY, IOType.INPUT);
-        if (requirements.isEmpty() || !(requirements.get(0) instanceof RequirementEnergy)) {
-            return 0;
+        return energyPerTick(context, IOType.OUTPUT) - energyPerTick(context, IOType.INPUT);
+    }
+
+    private static long energyPerTick(RecipeCraftingContext context, IOType ioType) {
+        long total = 0;
+        List<ComponentRequirement<?, ?>> requirements = context.getRequirementBy(RequirementTypesMM.REQUIREMENT_ENERGY, ioType);
+        for (ComponentRequirement<?, ?> requirement : requirements) {
+            if (requirement instanceof RequirementEnergy) {
+                total += energyPerTick(context, (RequirementEnergy) requirement);
+            }
         }
-        RequirementEnergy energy = (RequirementEnergy) requirements.get(0);
+        return total;
+    }
+
+    private static long energyPerTick(RecipeCraftingContext context, RequirementEnergy energy) {
         long perTick = energy.getRequiredEnergyPerTick();
         return Math.round(RecipeModifier.applyModifiers(context, energy, (double) perTick, false)
                 * context.getDurationMultiplier()

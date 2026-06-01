@@ -9,11 +9,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+
+import java.util.UUID;
 
 public class PacketTeleportToMachine implements IMessage {
 
@@ -52,15 +54,19 @@ public class PacketTeleportToMachine implements IMessage {
             }
             WorldServer world = server.getWorld(key.dimension);
             if (world == null) {
-                player.sendMessage(new TextComponentString("Dimension not found: " + key.dimension));
+                player.sendMessage(new TextComponentTranslation("message.modular_machinery_terminal.dimension_not_found", key.dimension));
                 return;
             }
             TileEntity tile = world.getTileEntity(key.pos);
             if (!(tile instanceof TileMultiblockMachineController)) {
-                player.sendMessage(new TextComponentString("Machine controller not found."));
+                player.sendMessage(new TextComponentTranslation("message.modular_machinery_terminal.machine_controller_not_found"));
                 return;
             }
             TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
+            UUID owner = controller.getOwner();
+            if (owner != null && !owner.equals(player.getUniqueID())) {
+                return;
+            }
             EnumFacing facing = controller.getControllerRotation();
             if (facing == null || facing.getAxis().isVertical()) {
                 facing = EnumFacing.SOUTH;
