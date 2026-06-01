@@ -129,17 +129,13 @@ public class PacketOpenMachineComponentGui implements IMessage {
                 player.posY = origY;
                 player.posZ = origZ;
             }
-            // Wrap the opened container so canInteractWith always returns true,
-            // preventing the GUI from closing on subsequent ticks.
-            wrapContainer(player);
-        }
-
-        private static void wrapContainer(EntityPlayerMP player) {
-            net.minecraft.inventory.Container original = player.openContainer;
-            if (original == null || original == player.inventoryContainer) {
-                return;
-            }
-            player.openContainer = new RemoteContainerWrapper(original, player);
+            // Track this player for tick-based coordinate spoofing so that
+            // canInteractWith distance checks pass on subsequent ticks.
+            // Unlike the old RemoteContainerWrapper approach, this preserves
+            // the original container class so that instanceof checks in
+            // MMCE/AE2 packet handlers (e.g. PktMEInputBusInvAction,
+            // PacketInventoryAction) still work correctly.
+            RemoteContainerTracker.track(player, target.pos);
         }
 
         private static void syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {
