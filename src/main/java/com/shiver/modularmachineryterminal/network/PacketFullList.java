@@ -3,6 +3,7 @@ package com.shiver.modularmachineryterminal.network;
 import com.shiver.modularmachineryterminal.client.ClientTerminalData;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.common.SummaryInfo;
+import com.shiver.modularmachineryterminal.common.TerminalConfig;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.PacketBuffer;
@@ -17,6 +18,8 @@ public class PacketFullList implements IMessage {
 
     private SummaryInfo summary = new SummaryInfo();
     private final List<MachineInfo> machines = new ArrayList<>();
+    private boolean teleportEnabled = true;
+    private String teleportRequiredGameStage = "";
 
     public PacketFullList() {
     }
@@ -24,6 +27,8 @@ public class PacketFullList implements IMessage {
     public PacketFullList(SummaryInfo summary, List<MachineInfo> machines) {
         this.summary = summary;
         this.machines.addAll(machines);
+        this.teleportEnabled = TerminalConfig.teleportEnabled;
+        this.teleportRequiredGameStage = TerminalConfig.teleportRequiredGameStage;
     }
 
     @Override
@@ -35,6 +40,8 @@ public class PacketFullList implements IMessage {
         for (int i = 0; i < count; i++) {
             machines.add(MachineInfo.read(buffer));
         }
+        teleportEnabled = buffer.readBoolean();
+        teleportRequiredGameStage = buffer.readString(Short.MAX_VALUE);
     }
 
     @Override
@@ -45,13 +52,18 @@ public class PacketFullList implements IMessage {
         for (MachineInfo machine : machines) {
             machine.write(buffer);
         }
+        buffer.writeBoolean(teleportEnabled);
+        buffer.writeString(teleportRequiredGameStage);
     }
 
     public static class Handler implements IMessageHandler<PacketFullList, IMessage> {
 
         @Override
         public IMessage onMessage(PacketFullList message, MessageContext ctx) {
-            Minecraft.getMinecraft().addScheduledTask(() -> ClientTerminalData.setFullList(message.summary, message.machines));
+            Minecraft.getMinecraft().addScheduledTask(() -> {
+                TerminalConfig.updateClientTeleportConfig(message.teleportEnabled, message.teleportRequiredGameStage);
+                ClientTerminalData.setFullList(message.summary, message.machines);
+            });
             return null;
         }
     }

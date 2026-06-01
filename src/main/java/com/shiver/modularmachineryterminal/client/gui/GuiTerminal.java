@@ -2,10 +2,12 @@ package com.shiver.modularmachineryterminal.client.gui;
 
 import com.shiver.modularmachineryterminal.client.ClientTerminalData;
 import com.shiver.modularmachineryterminal.common.ComponentGuiGroup;
+import com.shiver.modularmachineryterminal.common.GameStagesCompat;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import com.shiver.modularmachineryterminal.common.OutputInfo;
 import com.shiver.modularmachineryterminal.common.SummaryInfo;
+import com.shiver.modularmachineryterminal.common.TerminalConfig;
 import com.shiver.modularmachineryterminal.common.ThreadInfo;
 import com.shiver.modularmachineryterminal.network.PacketRequestDynamic;
 import com.shiver.modularmachineryterminal.network.PacketRequestFullList;
@@ -132,7 +134,9 @@ public class GuiTerminal extends GuiScreen {
                 return;
             }
             if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, 1), actionButtonSize(), actionButtonSize())) {
-                TerminalNetwork.CHANNEL.sendToServer(new PacketTeleportToMachine(machine.key));
+                if (canTeleport()) {
+                    TerminalNetwork.CHANNEL.sendToServer(new PacketTeleportToMachine(machine.key));
+                }
                 return;
             }
             for (int i = 2; i < 8; i++) {
@@ -291,10 +295,23 @@ public class GuiTerminal extends GuiScreen {
     private void drawActionTooltip(int left, int top, int mouseX, int mouseY) {
         for (int i = 0; i < 8; i++) {
             if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, i), actionButtonSize(), actionButtonSize())) {
-                currentTooltip = I18n.format(actionTooltipKey(i));
+                currentTooltip = actionTooltip(i);
                 return;
             }
         }
+    }
+
+    private String actionTooltip(int index) {
+        if (index == 1) {
+            if (!TerminalConfig.clientTeleportEnabled) {
+                return I18n.format("gui.modular_machinery_terminal.teleport_disabled");
+            }
+            String stage = TerminalConfig.clientTeleportRequiredGameStage;
+            if (stage != null && !stage.isEmpty() && !GameStagesCompat.hasStage(mc.player, stage)) {
+                return I18n.format("gui.modular_machinery_terminal.teleport_stage_locked", stage);
+            }
+        }
+        return I18n.format(actionTooltipKey(index));
     }
 
     private String actionTooltipKey(int index) {
@@ -316,6 +333,14 @@ public class GuiTerminal extends GuiScreen {
         if (index == 6) return ComponentGuiGroup.UPGRADE;
         if (index == 7) return ComponentGuiGroup.SMART_INTERFACE;
         return ComponentGuiGroup.INPUT;
+    }
+
+    private boolean canTeleport() {
+        if (!TerminalConfig.clientTeleportEnabled) {
+            return false;
+        }
+        String stage = TerminalConfig.clientTeleportRequiredGameStage;
+        return stage == null || stage.isEmpty() || GameStagesCompat.hasStage(mc.player, stage);
     }
 
     private void drawMachineList(int left, int top, int mouseX, int mouseY) {

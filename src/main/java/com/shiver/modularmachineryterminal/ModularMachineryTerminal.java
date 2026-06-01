@@ -2,6 +2,7 @@ package com.shiver.modularmachineryterminal;
 
 import com.shiver.modularmachineryterminal.common.CommonProxy;
 import com.shiver.modularmachineryterminal.common.registry.ModItems;
+import com.shiver.modularmachineryterminal.common.TerminalConfig;
 import com.shiver.modularmachineryterminal.network.RemoteContainerTracker;
 import com.shiver.modularmachineryterminal.network.TerminalNetwork;
 import com.shiver.modularmachineryterminal.server.MachineCache;
@@ -34,6 +35,7 @@ public class ModularMachineryTerminal {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
+        TerminalConfig.load(event.getSuggestedConfigurationFile());
         ModItems.init();
         TerminalNetwork.init();
         proxy.preInit();

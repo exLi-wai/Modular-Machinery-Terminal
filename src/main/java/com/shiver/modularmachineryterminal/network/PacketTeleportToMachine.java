@@ -1,6 +1,8 @@
 package com.shiver.modularmachineryterminal.network;
 
+import com.shiver.modularmachineryterminal.common.GameStagesCompat;
 import com.shiver.modularmachineryterminal.common.MachineKey;
+import com.shiver.modularmachineryterminal.common.TerminalConfig;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -50,6 +52,13 @@ public class PacketTeleportToMachine implements IMessage {
         private static void teleport(EntityPlayerMP player, MachineKey key) {
             MinecraftServer server = player.getServer();
             if (server == null || key == null) {
+                return;
+            }
+            if (!TerminalConfig.teleportEnabled) {
+                return;
+            }
+            String stage = TerminalConfig.teleportRequiredGameStage;
+            if (stage != null && !stage.isEmpty() && !GameStagesCompat.hasStage(player, stage)) {
                 return;
             }
             WorldServer world = server.getWorld(key.dimension);
