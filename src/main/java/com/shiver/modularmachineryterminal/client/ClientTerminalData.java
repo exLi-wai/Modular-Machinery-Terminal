@@ -25,7 +25,8 @@ public final class ClientTerminalData {
         }
     }
 
-    public static void updateDynamic(List<MachineInfo> machines, List<MachineKey> removed) {
+    public static void updateDynamic(SummaryInfo newSummary, List<MachineInfo> machines, List<MachineKey> removed) {
+        summary = newSummary;
         for (MachineKey key : removed) {
             MACHINES.remove(key);
         }

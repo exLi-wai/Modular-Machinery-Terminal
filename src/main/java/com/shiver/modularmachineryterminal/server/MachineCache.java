@@ -37,6 +37,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraftforge.common.util.BlockSnapshot;
 import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.event.world.ChunkEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
@@ -45,7 +46,6 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,6 +56,11 @@ import java.util.UUID;
 public class MachineCache {
 
     private static final Map<MachineKey, CachedMachine> CACHE = new LinkedHashMap<>();
+    private static final int DISCOVERY_SCAN_INTERVAL_TICKS = 100;
+    private static boolean persistedLoaded;
+    private static boolean discoveryDirty = true;
+    private static int lastDiscoveryScanTick = -DISCOVERY_SCAN_INTERVAL_TICKS;
+    private static MinecraftServer loadedServer;
 
     @SubscribeEvent
     public void onMachineTick(MachineTickEvent event) {
@@ -68,7 +73,42 @@ public class MachineCache {
             return;
         }
         MachineKey key = new MachineKey(event.getWorld().provider.getDimension(), event.getPos());
-        CACHE.remove(key);
+        removeMachine(key);
+        discoveryDirty = true;
+    }
+
+    @SubscribeEvent
+    public void onBlockPlace(BlockEvent.PlaceEvent event) {
+        if (event.getWorld() == null || event.getWorld().isRemote) {
+            return;
+        }
+        scheduleTrackPosition((WorldServer) event.getWorld(), event.getPos());
+    }
+
+    @SubscribeEvent
+    public void onMultiBlockPlace(BlockEvent.MultiPlaceEvent event) {
+        if (event.getWorld() == null || event.getWorld().isRemote) {
+            return;
+        }
+        WorldServer world = (WorldServer) event.getWorld();
+        for (BlockSnapshot snapshot : event.getReplacedBlockSnapshots()) {
+            scheduleTrackPosition(world, snapshot.getPos());
+        }
+    }
+
+    @SubscribeEvent
+    public void onChunkLoad(ChunkEvent.Load event) {
+        if (!(event.getWorld() instanceof WorldServer) || event.getWorld().isRemote || event.getChunk() == null) {
+            return;
+        }
+        WorldServer world = (WorldServer) event.getWorld();
+        Chunk chunk = event.getChunk();
+        discoveryDirty = true;
+        scanChunk(world, chunk, null);
+        world.addScheduledTask(() -> {
+            scanChunk(world, chunk, null);
+            validatePersistedInChunk(world, chunk.x, chunk.z);
+        });
     }
 
     @SubscribeEvent
@@ -89,16 +129,48 @@ public class MachineCache {
     }
 
     public static PacketFullList createFullListPacket(EntityPlayerMP player) {
-        refreshLoadedMachines();
+        MinecraftServer server = player.getServer();
+        loadPersistedIfNeeded(server);
+        refreshLoadedMachinesIfDue(server, false);
         List<MachineInfo> machines = new ArrayList<>();
-        SummaryInfo summary = new SummaryInfo();
         UUID playerId = player.getUniqueID();
         for (CachedMachine cached : CACHE.values()) {
             if (!visibleTo(cached, playerId)) {
                 continue;
             }
+            machines.add(cached.info);
+        }
+        return new PacketFullList(createSummary(playerId), machines);
+    }
+
+    public static PacketDynamic createDynamicPacket(EntityPlayerMP player, List<MachineKey> keys) {
+        MinecraftServer server = player.getServer();
+        loadPersistedIfNeeded(server);
+        List<MachineInfo> machines = new ArrayList<>();
+        List<MachineKey> removed = new ArrayList<>();
+        UUID playerId = player.getUniqueID();
+        for (MachineKey key : keys) {
+            if (key == null) {
+                continue;
+            }
+            refreshKey(server, key);
+            CachedMachine cached = CACHE.get(key);
+            if (visibleTo(cached, playerId)) {
+                machines.add(cached.info);
+            } else {
+                removed.add(key);
+            }
+        }
+        return new PacketDynamic(createSummary(playerId), machines, removed);
+    }
+
+    private static SummaryInfo createSummary(UUID playerId) {
+        SummaryInfo summary = new SummaryInfo();
+        for (CachedMachine cached : CACHE.values()) {
+            if (!visibleTo(cached, playerId)) {
+                continue;
+            }
             MachineInfo info = cached.info;
-            machines.add(info);
             summary.total++;
             if (info.loaded) {
                 summary.loaded++;
@@ -110,29 +182,26 @@ public class MachineCache {
                 summary.running++;
             }
         }
-        return new PacketFullList(summary, machines);
+        return summary;
     }
 
-    public static PacketDynamic createDynamicPacket(EntityPlayerMP player, List<MachineKey> keys) {
-        refreshLoadedMachines();
-        List<MachineInfo> machines = new ArrayList<>();
-        List<MachineKey> removed = new ArrayList<>();
-        UUID playerId = player.getUniqueID();
-        for (MachineKey key : keys) {
-            CachedMachine cached = CACHE.get(key);
-            if (visibleTo(cached, playerId)) {
-                machines.add(cached.info);
-            } else {
-                removed.add(key);
-            }
+    private static void refreshLoadedMachinesIfDue(MinecraftServer server, boolean force) {
+        if (server == null) {
+            return;
         }
-        return new PacketDynamic(machines, removed);
+        int tick = server.getTickCounter();
+        boolean due = tick - lastDiscoveryScanTick >= DISCOVERY_SCAN_INTERVAL_TICKS;
+        if (!force && !due) {
+            return;
+        }
+        refreshLoadedMachines(server);
+        lastDiscoveryScanTick = tick;
+        discoveryDirty = false;
     }
 
-    private static void refreshLoadedMachines() {
+    private static void refreshLoadedMachines(MinecraftServer server) {
         Set<MachineKey> foundLoaded = new HashSet<>();
 
-        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
         if (server == null) {
             return;
         }
@@ -152,18 +221,25 @@ public class MachineCache {
             }
         }
         for (MachineKey key : remove) {
-            CACHE.remove(key);
+            removeMachine(key);
         }
     }
 
     private static void scanWorld(WorldServer world, Set<MachineKey> foundLoaded) {
         for (Chunk chunk : new ArrayList<>(world.getChunkProvider().getLoadedChunks())) {
-            for (TileEntity tile : new ArrayList<>(chunk.getTileEntityMap().values())) {
-                trackTile(tile, foundLoaded);
-            }
+            scanChunk(world, chunk, foundLoaded);
         }
 
         for (TileEntity tile : new ArrayList<>(world.loadedTileEntityList)) {
+            trackTile(tile, foundLoaded);
+        }
+    }
+
+    private static void scanChunk(WorldServer world, Chunk chunk, Set<MachineKey> foundLoaded) {
+        if (world == null || chunk == null) {
+            return;
+        }
+        for (TileEntity tile : new ArrayList<>(chunk.getTileEntityMap().values())) {
             trackTile(tile, foundLoaded);
         }
     }
@@ -178,7 +254,9 @@ public class MachineCache {
         }
         MachineKey key = new MachineKey(controller.getWorld().provider.getDimension(), controller.getPos());
         if (update(controller, true)) {
-            foundLoaded.add(key);
+            if (foundLoaded != null) {
+                foundLoaded.add(key);
+            }
         }
     }
 
@@ -204,6 +282,108 @@ public class MachineCache {
         return world.getChunkProvider().getLoadedChunk(chunkX, chunkZ) != null;
     }
 
+    private static void refreshKey(MinecraftServer server, MachineKey key) {
+        if (server == null || key == null) {
+            return;
+        }
+        WorldServer world = server.getWorld(key.dimension);
+        if (world == null) {
+            return;
+        }
+        if (!isCachedPositionLoaded(server, key)) {
+            CachedMachine cached = CACHE.get(key);
+            if (cached != null) {
+                markUnloaded(cached);
+            }
+            return;
+        }
+        TileEntity tile = world.getTileEntity(key.pos);
+        if (tile instanceof TileMultiblockMachineController) {
+            update((TileMultiblockMachineController) tile, true);
+        } else {
+            removeMachine(key);
+        }
+    }
+
+    private static void scheduleTrackPosition(WorldServer world, BlockPos pos) {
+        discoveryDirty = true;
+        trackPosition(world, pos);
+        world.addScheduledTask(() -> trackPosition(world, pos));
+    }
+
+    private static void trackPosition(WorldServer world, BlockPos pos) {
+        if (world == null || pos == null) {
+            return;
+        }
+        trackTile(world.getTileEntity(pos), null);
+    }
+
+    private static void validatePersistedInChunk(WorldServer world, int chunkX, int chunkZ) {
+        MinecraftServer server = world.getMinecraftServer();
+        loadPersistedIfNeeded(server);
+        TerminalMachineSavedData savedData = savedData(server);
+        if (savedData == null) {
+            return;
+        }
+        List<MachineKey> remove = new ArrayList<>();
+        for (MachineKey key : savedData.entries().keySet()) {
+            if (key.dimension == world.provider.getDimension()
+                    && (key.pos.getX() >> 4) == chunkX
+                    && (key.pos.getZ() >> 4) == chunkZ
+                    && !(world.getTileEntity(key.pos) instanceof TileMultiblockMachineController)) {
+                remove.add(key);
+            }
+        }
+        for (MachineKey key : remove) {
+            removeMachine(key);
+        }
+    }
+
+    private static void loadPersistedIfNeeded(MinecraftServer server) {
+        if (server == null) {
+            return;
+        }
+        if (loadedServer != server) {
+            CACHE.clear();
+            persistedLoaded = false;
+            discoveryDirty = true;
+            lastDiscoveryScanTick = -DISCOVERY_SCAN_INTERVAL_TICKS;
+            loadedServer = server;
+        }
+        if (persistedLoaded) {
+            return;
+        }
+        TerminalMachineSavedData savedData = savedData(server);
+        if (savedData == null) {
+            return;
+        }
+        for (Map.Entry<MachineKey, TerminalMachineSavedData.PersistedMachine> entry : savedData.entries().entrySet()) {
+            if (CACHE.containsKey(entry.getKey())) {
+                continue;
+            }
+            CachedMachine cached = new CachedMachine();
+            cached.owner = entry.getValue().owner;
+            cached.info = entry.getValue().toUnloadedInfo();
+            CACHE.put(entry.getKey(), cached);
+        }
+        persistedLoaded = true;
+    }
+
+    private static TerminalMachineSavedData savedData(MinecraftServer server) {
+        return TerminalMachineSavedData.get(server);
+    }
+
+    private static void removeMachine(MachineKey key) {
+        if (key == null) {
+            return;
+        }
+        CACHE.remove(key);
+        TerminalMachineSavedData savedData = savedData(FMLCommonHandler.instance().getMinecraftServerInstance());
+        if (savedData != null) {
+            savedData.remove(key);
+        }
+    }
+
     private static boolean update(TileMultiblockMachineController controller, boolean loaded) {
         if (controller == null || controller.getWorld() == null) {
             return false;
@@ -213,6 +393,10 @@ public class MachineCache {
         CachedMachine cached = CACHE.computeIfAbsent(key, ignored -> new CachedMachine());
         cached.owner = controller.getOwner();
         cached.info = capture(controller, loaded);
+        TerminalMachineSavedData savedData = savedData(controller.getWorld().getMinecraftServer());
+        if (savedData != null) {
+            savedData.put(cached.info, cached.owner);
+        }
         return true;
     }
 
