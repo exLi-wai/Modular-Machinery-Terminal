@@ -1,4 +1,5 @@
 item.modularmachinery_terminal.terminal.name=模块化机械终端
+
 gui.modular_machinery_terminal.title=模块化机械终端
 gui.modular_machinery_terminal.search=搜索
 gui.modular_machinery_terminal.sort=排序
@@ -51,7 +52,7 @@ gui.modular_machinery_terminal.action_s=打开所有ME机械样板供应器
 gui.modular_machinery_terminal.action_u=打开升级总线
 gui.modular_machinery_terminal.action_m=打开智能数据接口GUI
 gui.modular_machinery_terminal.component_page=%s/%s
-message.modular_machinery_terminal.machine_controller_not_found=未找到机械控制器。
+
 message.modular_machinery_terminal.dimension_not_found=未找到维度：%s
 message.modular_machinery_terminal.no_gui_found=未找到%s。
 message.modular_machinery_terminal.gui_group.controller=控制器
@@ -60,3 +61,11 @@ message.modular_machinery_terminal.gui_group.output=输出仓
 message.modular_machinery_terminal.gui_group.pattern=样板供应器
 message.modular_machinery_terminal.gui_group.upgrade=升级总线
 message.modular_machinery_terminal.gui_group.smart_interface=智能数据接口
+
+modular_machinery_terminal.machine_prefix=[MMT] %s | 维度 %s @
+modular_machinery_terminal.teleport_hover=点击填入: %s
+modular_machinery_terminal.machine_status= | %s | %s
+modular_machinery_terminal.formed=已成型
+modular_machinery_terminal.unformed=未成型
+modular_machinery_terminal.running=运行中
+modular_machinery_terminal.not_running=未运行

@@ -1,4 +1,5 @@
 item.modularmachinery_terminal.terminal.name=Modular Machinery Terminal
+
 gui.modular_machinery_terminal.title=Modular Machinery Terminal
 gui.modular_machinery_terminal.search=Search
 gui.modular_machinery_terminal.sort=Sort
@@ -51,7 +52,7 @@ gui.modular_machinery_terminal.action_s=Open ME pattern providers
 gui.modular_machinery_terminal.action_u=Open upgrade buses
 gui.modular_machinery_terminal.action_m=Open smart interface GUI
 gui.modular_machinery_terminal.component_page=%s/%s
-message.modular_machinery_terminal.machine_controller_not_found=Machine controller not found.
+
 message.modular_machinery_terminal.dimension_not_found=Dimension not found: %s
 message.modular_machinery_terminal.no_gui_found=No GUI found for %s.
 message.modular_machinery_terminal.gui_group.controller=controller
@@ -60,3 +61,11 @@ message.modular_machinery_terminal.gui_group.output=output bus
 message.modular_machinery_terminal.gui_group.pattern=pattern provider
 message.modular_machinery_terminal.gui_group.upgrade=upgrade bus
 message.modular_machinery_terminal.gui_group.smart_interface=smart interface
+
+modular_machinery_terminal.machine_prefix=[MMT] %s | Dim %s @
+modular_machinery_terminal.teleport_hover=Click to suggest: %s
+modular_machinery_terminal.machine_status= | %s | %s
+modular_machinery_terminal.formed=Formed
+modular_machinery_terminal.unformed=Unformed
+modular_machinery_terminal.running=Running
+modular_machinery_terminal.not_running=Not running
