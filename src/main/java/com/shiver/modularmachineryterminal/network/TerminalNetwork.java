@@ -1,13 +1,12 @@
 package com.shiver.modularmachineryterminal.network;
 
-import com.shiver.modularmachineryterminal.ModularMachineryTerminal;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
 
 public final class TerminalNetwork {
 
-    public static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(ModularMachineryTerminal.MOD_ID);
+    public static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel("mmt");
 
     private TerminalNetwork() {
     }
