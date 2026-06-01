@@ -20,6 +20,7 @@ public class PacketFullList implements IMessage {
     private final List<MachineInfo> machines = new ArrayList<>();
     private boolean teleportEnabled = true;
     private String teleportRequiredGameStage = "";
+    private boolean teamAccessEnabled = true;
 
     public PacketFullList() {
     }
@@ -29,6 +30,7 @@ public class PacketFullList implements IMessage {
         this.machines.addAll(machines);
         this.teleportEnabled = TerminalConfig.teleportEnabled;
         this.teleportRequiredGameStage = TerminalConfig.teleportRequiredGameStage;
+        this.teamAccessEnabled = TerminalConfig.teamAccessEnabled;
     }
 
     @Override
@@ -42,6 +44,7 @@ public class PacketFullList implements IMessage {
         }
         teleportEnabled = buffer.readBoolean();
         teleportRequiredGameStage = buffer.readString(Short.MAX_VALUE);
+        teamAccessEnabled = buffer.readBoolean();
     }
 
     @Override
@@ -54,6 +57,7 @@ public class PacketFullList implements IMessage {
         }
         buffer.writeBoolean(teleportEnabled);
         buffer.writeString(teleportRequiredGameStage);
+        buffer.writeBoolean(teamAccessEnabled);
     }
 
     public static class Handler implements IMessageHandler<PacketFullList, IMessage> {
@@ -61,7 +65,7 @@ public class PacketFullList implements IMessage {
         @Override
         public IMessage onMessage(PacketFullList message, MessageContext ctx) {
             Minecraft.getMinecraft().addScheduledTask(() -> {
-                TerminalConfig.updateClientTeleportConfig(message.teleportEnabled, message.teleportRequiredGameStage);
+                TerminalConfig.updateClientConfig(message.teleportEnabled, message.teleportRequiredGameStage, message.teamAccessEnabled);
                 ClientTerminalData.setFullList(message.summary, message.machines);
             });
             return null;

@@ -8,9 +8,11 @@ public class TerminalConfig {
 
     public static boolean teleportEnabled = true;
     public static String teleportRequiredGameStage = "";
+    public static boolean teamAccessEnabled = true;
 
     public static boolean clientTeleportEnabled = true;
     public static String clientTeleportRequiredGameStage = "";
+    public static boolean clientTeamAccessEnabled = true;
 
     private static Configuration config;
 
@@ -37,16 +39,27 @@ public class TerminalConfig {
                 "",
                 "GameStage required to use controller teleport. Empty means no stage is required."
         ).trim();
+        teamAccessEnabled = config.getBoolean(
+                "teamAccessEnabled",
+                "team",
+                true,
+                "Whether players can access controllers owned by FTB Utilities teammates."
+        );
 
         if (config.hasChanged()) {
             config.save();
         }
 
-        updateClientTeleportConfig(teleportEnabled, teleportRequiredGameStage);
+        updateClientConfig(teleportEnabled, teleportRequiredGameStage, teamAccessEnabled);
     }
 
     public static void updateClientTeleportConfig(boolean enabled, String requiredGameStage) {
         clientTeleportEnabled = enabled;
         clientTeleportRequiredGameStage = requiredGameStage == null ? "" : requiredGameStage.trim();
+    }
+
+    public static void updateClientConfig(boolean teleportEnabled, String requiredGameStage, boolean teamAccessEnabled) {
+        updateClientTeleportConfig(teleportEnabled, requiredGameStage);
+        clientTeamAccessEnabled = teamAccessEnabled;
     }
 }

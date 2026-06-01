@@ -1,6 +1,7 @@
 package com.shiver.modularmachineryterminal.network;
 
 import com.shiver.modularmachineryterminal.common.ComponentGuiGroup;
+import com.shiver.modularmachineryterminal.common.MachineAccess;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import hellfirepvp.modularmachinery.common.crafting.helper.ProcessingComponent;
 import hellfirepvp.modularmachinery.common.tiles.TileFluidInputHatch;
@@ -97,7 +98,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
             TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
             UUID owner = controller.getOwner();
-            if (owner != null && !owner.equals(player.getUniqueID())) {
+            if (!MachineAccess.canAccess(player, owner, true)) {
                 return;
             }
             List<TargetGui> targets = targets(controller, message.group);

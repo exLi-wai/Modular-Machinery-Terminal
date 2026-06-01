@@ -15,12 +15,18 @@ import java.util.List;
 public class PacketRequestDynamic implements IMessage {
 
     private final List<MachineKey> keys = new ArrayList<>();
+    private boolean includeTeamControllers = true;
 
     public PacketRequestDynamic() {
     }
 
     public PacketRequestDynamic(List<MachineKey> keys) {
         this.keys.addAll(keys);
+    }
+
+    public PacketRequestDynamic(List<MachineKey> keys, boolean includeTeamControllers) {
+        this.keys.addAll(keys);
+        this.includeTeamControllers = includeTeamControllers;
     }
 
     @Override
@@ -31,6 +37,7 @@ public class PacketRequestDynamic implements IMessage {
         for (int i = 0; i < count; i++) {
             keys.add(MachineKey.read(buffer));
         }
+        includeTeamControllers = buffer.readBoolean();
     }
 
     @Override
@@ -40,6 +47,7 @@ public class PacketRequestDynamic implements IMessage {
         for (MachineKey key : keys) {
             key.write(buffer);
         }
+        buffer.writeBoolean(includeTeamControllers);
     }
 
     public static class Handler implements IMessageHandler<PacketRequestDynamic, IMessage> {
@@ -48,7 +56,7 @@ public class PacketRequestDynamic implements IMessage {
         public IMessage onMessage(PacketRequestDynamic message, MessageContext ctx) {
             EntityPlayerMP player = ctx.getServerHandler().player;
             player.getServerWorld().addScheduledTask(() -> TerminalNetwork.CHANNEL.sendTo(
-                    MachineCache.createDynamicPacket(player, message.keys),
+                    MachineCache.createDynamicPacket(player, message.keys, message.includeTeamControllers),
                     player
             ));
             return null;

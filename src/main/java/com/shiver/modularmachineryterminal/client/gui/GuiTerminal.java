@@ -2,6 +2,7 @@ package com.shiver.modularmachineryterminal.client.gui;
 
 import com.shiver.modularmachineryterminal.client.ClientTerminalData;
 import com.shiver.modularmachineryterminal.common.ComponentGuiGroup;
+import com.shiver.modularmachineryterminal.common.FTBUtilitiesCompat;
 import com.shiver.modularmachineryterminal.common.GameStagesCompat;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.common.MachineKey;
@@ -36,6 +37,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +61,7 @@ public class GuiTerminal extends GuiScreen {
     private static MachineKey selected;
     private static SortMode sortMode = SortMode.NAME;
     private static boolean descending;
+    private static boolean showTeamControllers = true;
     private static int scroll;
     private static int threadScroll;
     private static boolean settingsLoaded;
@@ -78,7 +81,7 @@ public class GuiTerminal extends GuiScreen {
         searchField.setMaxStringLength(40);
         loadPinnedMachines();
         buttonList.clear();
-        TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList());
+        TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList(showTeamControllers));
     }
 
     @Override
@@ -90,10 +93,10 @@ public class GuiTerminal extends GuiScreen {
     public void updateScreen() {
         searchField.updateCursorCounter();
         if (mc.player.ticksExisted % 20 == 0) {
-            TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList());
+            TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList(showTeamControllers));
         }
         if (mc.player.ticksExisted % 4 == 0) {
-            TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys()));
+            TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys(), showTeamControllers));
         }
     }
 
@@ -116,7 +119,7 @@ public class GuiTerminal extends GuiScreen {
         drawActionButtons(left, top, mouseX, mouseY);
         drawActionTooltip(left, top, mouseX, mouseY);
         if (currentTooltip != null) {
-            drawHoveringText(currentTooltip, mouseX, mouseY);
+            drawHoveringText(Arrays.asList(currentTooltip.split("\n")), mouseX, mouseY);
         }
     }
 
@@ -126,6 +129,16 @@ public class GuiTerminal extends GuiScreen {
         int left = guiLeft();
         int top = guiTop();
         MachineInfo machine = selectedMachine();
+
+        if (mouseButton == 0 && inside(mouseX, mouseY, teamControllersX(left), top + 32, 14, 14)) {
+            if (canToggleTeamControllers()) {
+                showTeamControllers = !showTeamControllers;
+                scroll = 0;
+                saveSettings();
+                TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList(showTeamControllers));
+            }
+            return;
+        }
 
         if (machine != null && mouseButton == 0) {
             if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, 0), actionButtonSize(), actionButtonSize())) {
@@ -169,7 +182,7 @@ public class GuiTerminal extends GuiScreen {
             if (inside(mouseX, mouseY, listX, y, LIST_ROW_WIDTH, ROW_HEIGHT - 2)) {
                 selected = visible.get(scroll + i).key;
                 threadScroll = 0;
-                TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys()));
+                TerminalNetwork.CHANNEL.sendToServer(new PacketRequestDynamic(dynamicKeys(), showTeamControllers));
             }
         }
     }
@@ -251,6 +264,11 @@ public class GuiTerminal extends GuiScreen {
     private void drawControls(int left, int top, int mouseX, int mouseY) {
         drawSmallButton(sortX(left), top + 32, 64, 14, sortLabel(), inside(mouseX, mouseY, sortX(left), top + 32, 64, 14));
         drawSmallButton(directionX(left), top + 32, 30, 14, directionLabel(), inside(mouseX, mouseY, directionX(left), top + 32, 30, 14));
+        boolean teamHovered = inside(mouseX, mouseY, teamControllersX(left), top + 32, 14, 14);
+        drawSmallButton(teamControllersX(left), top + 32, 14, 14, "F", teamHovered);
+        if (teamHovered) {
+            currentTooltip = teamControllersTooltip();
+        }
     }
 
     private void drawSmallButton(int x, int y, int width, int height, String text, boolean hovered) {
@@ -258,7 +276,9 @@ public class GuiTerminal extends GuiScreen {
         int fill = hovered ? 0xFF394650 : 0xFF273039;
         drawRect(x, y, x + width, y + height, border);
         drawRect(x + 1, y + 1, x + width - 1, y + height - 1, fill);
-        fontRenderer.drawString(trim(text, width - 6), x + 3, y + 3, 0xFFD8DEE5);
+        String label = trim(text, width - 6);
+        int textWidth = fontRenderer.getStringWidth(label);
+        fontRenderer.drawString(label, x + (width - textWidth) / 2 + 1, y + 3, 0xFFD8DEE5);
     }
 
     private void drawActionButtons(int left, int top, int mouseX, int mouseY) {
@@ -335,12 +355,31 @@ public class GuiTerminal extends GuiScreen {
         return ComponentGuiGroup.INPUT;
     }
 
+    private boolean canToggleTeamControllers() {
+        return TerminalConfig.clientTeamAccessEnabled && FTBUtilitiesCompat.isLoaded();
+    }
+
     private boolean canTeleport() {
         if (!TerminalConfig.clientTeleportEnabled) {
             return false;
         }
         String stage = TerminalConfig.clientTeleportRequiredGameStage;
         return stage == null || stage.isEmpty() || GameStagesCompat.hasStage(mc.player, stage);
+    }
+
+    private String teamControllersTooltip() {
+        if (!TerminalConfig.clientTeamAccessEnabled) {
+            return I18n.format("gui.modular_machinery_terminal.team_controllers_disabled");
+        }
+        if (!FTBUtilitiesCompat.isLoaded()) {
+            return I18n.format("gui.modular_machinery_terminal.show_team_controllers")
+                    + "\n"
+                    + I18n.format("gui.modular_machinery_terminal.ftbu_required");
+        }
+        return I18n.format("gui.modular_machinery_terminal.show_team_controllers")
+                + "\n"
+                + I18n.format("gui.modular_machinery_terminal.current_state",
+                I18n.format(showTeamControllers ? "gui.modular_machinery_terminal.state_on" : "gui.modular_machinery_terminal.state_off"));
     }
 
     private void drawMachineList(int left, int top, int mouseX, int mouseY) {
@@ -731,6 +770,9 @@ public class GuiTerminal extends GuiScreen {
                 if (parts.length >= 2) {
                     sortMode = SortMode.valueOf(parts[0]);
                     descending = Boolean.parseBoolean(parts[1]);
+                    if (parts.length >= 3) {
+                        showTeamControllers = Boolean.parseBoolean(parts[2]);
+                    }
                 }
             }
         } catch (Exception ignored) {
@@ -744,7 +786,7 @@ public class GuiTerminal extends GuiScreen {
             parent.mkdirs();
         }
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            writer.write(sortMode.name() + "," + descending);
+            writer.write(sortMode.name() + "," + descending + "," + showTeamControllers);
             writer.newLine();
         } catch (IOException ignored) {
         }
@@ -796,6 +838,10 @@ public class GuiTerminal extends GuiScreen {
 
     private int directionX(int left) {
         return left + 155;
+    }
+
+    private int teamControllersX(int left) {
+        return left + 188;
     }
 
     private int legendX(int left) {

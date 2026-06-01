@@ -1,5 +1,6 @@
 package com.shiver.modularmachineryterminal.network;
 
+import com.shiver.modularmachineryterminal.common.MachineAccess;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import hellfirepvp.modularmachinery.common.tiles.TileSmartInterface;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
@@ -71,6 +72,10 @@ public class PacketUpdateSmartInterface implements IMessage {
             TileEntity interfaceTile = world.getTileEntity(message.interfacePos);
             if (!(controllerTile instanceof TileMultiblockMachineController) || !(interfaceTile instanceof TileSmartInterface)) {
                 player.sendMessage(new TextComponentString("Smart interface not found."));
+                return;
+            }
+            TileMultiblockMachineController controller = (TileMultiblockMachineController) controllerTile;
+            if (!MachineAccess.canAccess(player, controller.getOwner(), true)) {
                 return;
             }
             TileSmartInterface smartInterface = (TileSmartInterface) interfaceTile;

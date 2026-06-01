@@ -1,6 +1,7 @@
 package com.shiver.modularmachineryterminal.network;
 
 import com.shiver.modularmachineryterminal.common.GameStagesCompat;
+import com.shiver.modularmachineryterminal.common.MachineAccess;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import com.shiver.modularmachineryterminal.common.TerminalConfig;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
@@ -73,7 +74,7 @@ public class PacketTeleportToMachine implements IMessage {
             }
             TileMultiblockMachineController controller = (TileMultiblockMachineController) tile;
             UUID owner = controller.getOwner();
-            if (owner != null && !owner.equals(player.getUniqueID())) {
+            if (!MachineAccess.canAccess(player, owner, true)) {
                 return;
             }
             EnumFacing facing = controller.getControllerRotation();

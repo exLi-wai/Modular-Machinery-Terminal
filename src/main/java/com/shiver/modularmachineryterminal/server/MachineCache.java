@@ -1,5 +1,6 @@
 package com.shiver.modularmachineryterminal.server;
 
+import com.shiver.modularmachineryterminal.common.MachineAccess;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.common.MachineKey;
 import com.shiver.modularmachineryterminal.common.OutputInfo;
@@ -128,46 +129,44 @@ public class MachineCache {
         }
     }
 
-    public static PacketFullList createFullListPacket(EntityPlayerMP player) {
+    public static PacketFullList createFullListPacket(EntityPlayerMP player, boolean includeTeamControllers) {
         MinecraftServer server = player.getServer();
         loadPersistedIfNeeded(server);
         refreshLoadedMachinesIfDue(server, false);
         List<MachineInfo> machines = new ArrayList<>();
-        UUID playerId = player.getUniqueID();
         for (CachedMachine cached : CACHE.values()) {
-            if (!visibleTo(cached, playerId)) {
+            if (!visibleTo(cached, player, includeTeamControllers)) {
                 continue;
             }
             machines.add(cached.info);
         }
-        return new PacketFullList(createSummary(playerId), machines);
+        return new PacketFullList(createSummary(player, includeTeamControllers), machines);
     }
 
-    public static PacketDynamic createDynamicPacket(EntityPlayerMP player, List<MachineKey> keys) {
+    public static PacketDynamic createDynamicPacket(EntityPlayerMP player, List<MachineKey> keys, boolean includeTeamControllers) {
         MinecraftServer server = player.getServer();
         loadPersistedIfNeeded(server);
         List<MachineInfo> machines = new ArrayList<>();
         List<MachineKey> removed = new ArrayList<>();
-        UUID playerId = player.getUniqueID();
         for (MachineKey key : keys) {
             if (key == null) {
                 continue;
             }
             refreshKey(server, key);
             CachedMachine cached = CACHE.get(key);
-            if (visibleTo(cached, playerId)) {
+            if (visibleTo(cached, player, includeTeamControllers)) {
                 machines.add(cached.info);
             } else {
                 removed.add(key);
             }
         }
-        return new PacketDynamic(createSummary(playerId), machines, removed);
+        return new PacketDynamic(createSummary(player, includeTeamControllers), machines, removed);
     }
 
-    private static SummaryInfo createSummary(UUID playerId) {
+    private static SummaryInfo createSummary(EntityPlayerMP player, boolean includeTeamControllers) {
         SummaryInfo summary = new SummaryInfo();
         for (CachedMachine cached : CACHE.values()) {
-            if (!visibleTo(cached, playerId)) {
+            if (!visibleTo(cached, player, includeTeamControllers)) {
                 continue;
             }
             MachineInfo info = cached.info;
@@ -400,8 +399,8 @@ public class MachineCache {
         return true;
     }
 
-    private static boolean visibleTo(CachedMachine cached, UUID playerId) {
-        return cached != null && (cached.owner == null || playerId.equals(cached.owner));
+    private static boolean visibleTo(CachedMachine cached, EntityPlayerMP player, boolean includeTeamControllers) {
+        return cached != null && MachineAccess.canAccess(player, cached.owner, includeTeamControllers);
     }
 
     private static MachineInfo capture(TileMultiblockMachineController controller, boolean loaded) {
