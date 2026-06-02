@@ -36,7 +36,7 @@ public abstract class MixinMMCEEventHandler {
             )
     )
     private static boolean terminal$redirectCheckTERange(EntityPlayer player, TileEntity te) {
-        if (RemoteContainerTracker.isTracked(player.getUniqueID())) {
+        if (RemoteContainerTracker.isTrackedTarget(player.getUniqueID(), te)) {
             return false; // false = not out of range → don't close GUI
         }
         // Call original logic inline (since checkTERange is private static,

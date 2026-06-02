@@ -139,7 +139,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
             // the original container class so that instanceof checks in
             // MMCE/AE2 packet handlers (e.g. PktMEInputBusInvAction,
             // PacketInventoryAction) still work correctly.
-            RemoteContainerTracker.track(player, target.pos);
+            RemoteContainerTracker.track(player, message.key, target.pos);
         }
 
         private static void syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {
@@ -211,6 +211,20 @@ public class PacketOpenMachineComponentGui implements IMessage {
                     .thenComparingInt(target -> target.pos.getX())
                     .thenComparingInt(target -> target.pos.getZ()));
             return list;
+        }
+
+        static boolean hasTarget(TileMultiblockMachineController controller, BlockPos pos) {
+            if (controller == null || pos == null) {
+                return false;
+            }
+            for (ComponentGuiGroup group : ComponentGuiGroup.values()) {
+                for (TargetGui target : targets(controller, group)) {
+                    if (pos.equals(target.pos)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private static void addTarget(Map<BlockPos, TargetGui> targets, TileEntity tile, ComponentGuiGroup group) {

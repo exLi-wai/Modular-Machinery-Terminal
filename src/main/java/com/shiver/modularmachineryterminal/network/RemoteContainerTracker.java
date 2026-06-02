@@ -1,8 +1,15 @@
 package com.shiver.modularmachineryterminal.network;
 
+import com.shiver.modularmachineryterminal.common.MachineAccess;
+import com.shiver.modularmachineryterminal.common.MachineKey;
+import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.inventory.Container;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldServer;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.Side;
 
@@ -13,8 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Tracks players who have remotely-opened containers via the terminal.
  * <p>
- * This is a simple registry that maps player UUIDs to the target block
- * position. The actual distance check bypass is handled by Mixins:
+ * The actual distance check bypass is handled by Mixins:
  * <ul>
  *   <li>{@code MixinEntityPlayerMP} — bypasses vanilla's
  *       {@code Container.canInteractWith()} check</li>
@@ -22,22 +28,33 @@ import java.util.concurrent.ConcurrentHashMap;
  *       {@code EventHandler.checkTERange()} check</li>
  * </ul>
  * <p>
- * The tick handler only detects when the container is closed so the
- * player can be automatically untracked.
+ * The tick handler closes the remote GUI when the tracked controller or
+ * target tile entity is no longer valid.
  */
 public class RemoteContainerTracker {
 
-    /** Maps player UUID → target block position. */
-    private static final Map<UUID, BlockPos> tracked = new ConcurrentHashMap<>();
+    private static final Map<UUID, Session> tracked = new ConcurrentHashMap<>();
 
     /**
      * Begin tracking a player for remote container access.
      *
      * @param player    the player who opened a remote container
-     * @param targetPos the position of the tile entity they are interacting with
+     * @param machineKey the controller position of the source machine
+     * @param targetPos  the position of the tile entity they are interacting with
      */
-    public static void track(EntityPlayerMP player, BlockPos targetPos) {
-        tracked.put(player.getUniqueID(), targetPos);
+    public static void track(EntityPlayerMP player, MachineKey machineKey, BlockPos targetPos) {
+        if (player == null || machineKey == null || targetPos == null || player.openContainer == player.inventoryContainer) {
+            return;
+        }
+        WorldServer world = player.server.getWorld(machineKey.dimension);
+        if (world == null) {
+            return;
+        }
+        TileEntity targetTile = world.getTileEntity(targetPos);
+        if (targetTile == null) {
+            return;
+        }
+        tracked.put(player.getUniqueID(), new Session(machineKey, targetPos, targetTile.getClass(), player.openContainer));
     }
 
     /**
@@ -47,12 +64,17 @@ public class RemoteContainerTracker {
         tracked.remove(playerId);
     }
 
-    /**
-     * Check whether a player is currently being tracked for remote access.
-     * Called by the Mixins to decide whether to bypass distance checks.
-     */
-    public static boolean isTracked(UUID playerId) {
-        return tracked.containsKey(playerId);
+    public static boolean isTrackedContainer(UUID playerId, Container container) {
+        Session session = tracked.get(playerId);
+        return session != null && session.container == container;
+    }
+
+    public static boolean isTrackedTarget(UUID playerId, TileEntity tile) {
+        Session session = tracked.get(playerId);
+        return session != null && tile != null
+                && tile.getWorld() != null
+                && session.machineKey.dimension == tile.getWorld().provider.getDimension()
+                && session.targetPos.equals(tile.getPos());
     }
 
     /**
@@ -69,13 +91,57 @@ public class RemoteContainerTracker {
         }
         EntityPlayerMP player = (EntityPlayerMP) event.player;
         UUID id = player.getUniqueID();
-        if (!tracked.containsKey(id)) {
+        Session session = tracked.get(id);
+        if (session == null) {
             return;
         }
 
-        // If the player has closed the container, stop tracking.
-        if (player.openContainer == player.inventoryContainer) {
+        if (player.openContainer == player.inventoryContainer || player.openContainer != session.container) {
             tracked.remove(id);
+            return;
+        }
+
+        if (!session.isValid(player)) {
+            player.closeScreen();
+            tracked.remove(id);
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        tracked.remove(event.player.getUniqueID());
+    }
+
+    private static class Session {
+
+        private final MachineKey machineKey;
+        private final BlockPos targetPos;
+        private final Class<?> targetType;
+        private final Container container;
+
+        private Session(MachineKey machineKey, BlockPos targetPos, Class<?> targetType, Container container) {
+            this.machineKey = machineKey;
+            this.targetPos = targetPos;
+            this.targetType = targetType;
+            this.container = container;
+        }
+
+        private boolean isValid(EntityPlayerMP player) {
+            WorldServer world = player.server.getWorld(machineKey.dimension);
+            if (world == null) {
+                return false;
+            }
+            TileEntity controllerTile = world.getTileEntity(machineKey.pos);
+            if (!(controllerTile instanceof TileMultiblockMachineController)) {
+                return false;
+            }
+            TileEntity targetTile = world.getTileEntity(targetPos);
+            if (targetTile == null || targetTile.getClass() != targetType) {
+                return false;
+            }
+            TileMultiblockMachineController controller = (TileMultiblockMachineController) controllerTile;
+            return PacketOpenMachineComponentGui.Handler.hasTarget(controller, targetPos)
+                    && MachineAccess.canAccess(player, controller.getOwner(), true);
         }
     }
 }

@@ -21,9 +21,10 @@ public abstract class MixinEntityPlayerMP {
 
     /**
      * Redirects the {@code this.openContainer.canInteractWith(this)} call
-     * in {@code EntityPlayerMP.onUpdate()} (line ~363). If the player is
-     * tracked by {@link RemoteContainerTracker}, returns {@code true}
-     * unconditionally to prevent the GUI from being closed.
+     * in {@code EntityPlayerMP.onUpdate()} (line ~363). If this exact
+     * container was opened remotely by the terminal, returns {@code true}
+     * to prevent the vanilla distance check from closing it. The tracker
+     * validates the target controller and tile entity every server tick.
      */
     @Redirect(
             method = "onUpdate",
@@ -33,7 +34,7 @@ public abstract class MixinEntityPlayerMP {
             )
     )
     private boolean terminal$redirectCanInteractWith(Container container, EntityPlayer player) {
-        if (RemoteContainerTracker.isTracked(player.getUniqueID())) {
+        if (RemoteContainerTracker.isTrackedContainer(player.getUniqueID(), container)) {
             return true;
         }
         return container.canInteractWith(player);
