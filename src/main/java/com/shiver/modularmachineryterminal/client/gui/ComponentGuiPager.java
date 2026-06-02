@@ -36,15 +36,30 @@ public class ComponentGuiPager {
         openedFromTerminal = true;
     }
 
+    public static void clear() {
+        // Clear terminal-opened pager context so manually opened MMCE GUIs
+        // don't inherit stale machine and component positions.
+        key = null;
+        group = null;
+        index = 0;
+        total = 0;
+        targetPos = null;
+        openedFromTerminal = false;
+    }
+
     @SubscribeEvent
     public void onGuiOpen(net.minecraftforge.client.event.GuiOpenEvent event) {
         if (openedFromTerminal) {
             if (event.getGui() == null) {
+                // Closing a remote component GUI returns the player to the
+                // terminal instead of dropping them back to the world.
                 event.setGui(new GuiTerminal());
-                openedFromTerminal = false;
+                clear();
             } else if (!(event.getGui() instanceof GuiContainer)) {
-                openedFromTerminal = false;
+                clear();
             }
+        } else {
+            clear();
         }
     }
 
