@@ -63,9 +63,4 @@ message.modular_machinery_terminal.gui_group.upgrade=upgrade bus
 message.modular_machinery_terminal.gui_group.smart_interface=smart interface
 
 modular_machinery_terminal.machine_prefix=[MMT] %s | Dim %s @
-modular_machinery_terminal.teleport_hover=Click to suggest: %s
-modular_machinery_terminal.machine_status= | %s | %s
-modular_machinery_terminal.formed=Formed
 modular_machinery_terminal.unformed=Unformed
-modular_machinery_terminal.running=Running
-modular_machinery_terminal.not_running=Not running

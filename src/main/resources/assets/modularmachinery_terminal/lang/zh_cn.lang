@@ -63,9 +63,4 @@ message.modular_machinery_terminal.gui_group.upgrade=升级总线
 message.modular_machinery_terminal.gui_group.smart_interface=智能数据接口
 
 modular_machinery_terminal.machine_prefix=[MMT] %s | 维度 %s @
-modular_machinery_terminal.teleport_hover=点击填入: %s
-modular_machinery_terminal.machine_status= | %s | %s
-modular_machinery_terminal.formed=已成型
 modular_machinery_terminal.unformed=未成型
-modular_machinery_terminal.running=运行中
-modular_machinery_terminal.not_running=未运行
