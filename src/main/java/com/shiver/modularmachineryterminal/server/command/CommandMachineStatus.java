@@ -36,12 +36,17 @@ public class CommandMachineStatus extends CommandBase {
             throw new CommandException(getUsage(sender));
         }
 
-        EntityPlayerMP queryTarget = args.length == 1
-                ? getPlayer(server, sender, args[0])
-                : getCommandSenderAsPlayer(sender);
-        EntityPlayerMP recipient = getCommandSenderAsPlayer(sender);
+        EntityPlayerMP queryTarget;
+        if (args.length == 1) {
+            if (!sender.canUseCommand(2, getName())) {
+                throw new CommandException("commands.generic.permission");
+            }
+            queryTarget = getPlayer(server, sender, args[0]);
+        } else {
+            queryTarget = getCommandSenderAsPlayer(sender);
+        }
         for (MachineInfo info : MachineCache.listUnformedMachines(queryTarget, true)) {
-            PlayerLoggedInHandler.sendMachineInfo(recipient, info);
+            PlayerLoggedInHandler.sendMachineInfo(sender, info);
         }
     }
 }

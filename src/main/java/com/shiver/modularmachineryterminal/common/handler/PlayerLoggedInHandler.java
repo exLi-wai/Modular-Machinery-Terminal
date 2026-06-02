@@ -3,6 +3,7 @@ package com.shiver.modularmachineryterminal.common.handler;
 import com.shiver.modularmachineryterminal.ModularMachineryTerminal;
 import com.shiver.modularmachineryterminal.common.MachineInfo;
 import com.shiver.modularmachineryterminal.server.MachineCache;
+import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.Style;
@@ -29,7 +30,7 @@ public class PlayerLoggedInHandler {
         }
     }
 
-    public static void sendMachineInfo(EntityPlayerMP player, MachineInfo info) {
+    public static void sendMachineInfo(ICommandSender target, MachineInfo info) {
         BlockPos pos = info.key.pos;
         int dimension = info.key.dimension;
 
@@ -43,6 +44,6 @@ public class PlayerLoggedInHandler {
 
         message.appendSibling(cord);
         message.appendSibling(new TextComponentTranslation("modular_machinery_terminal.unformed"));
-        player.sendMessage(message);
+        target.sendMessage(message);
     }
 }

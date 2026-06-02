@@ -19,6 +19,7 @@ import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementEnerg
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementFluid;
 import hellfirepvp.modularmachinery.common.crafting.requirement.RequirementItem;
 import hellfirepvp.modularmachinery.common.lib.RequirementTypesMM;
+import hellfirepvp.modularmachinery.common.block.BlockController;
 import hellfirepvp.modularmachinery.common.machine.DynamicMachine;
 import hellfirepvp.modularmachinery.common.machine.IOType;
 import hellfirepvp.modularmachinery.common.machine.RecipeThread;
@@ -30,6 +31,7 @@ import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineContr
 import hellfirepvp.modularmachinery.common.util.SmartInterfaceData;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
@@ -735,7 +737,21 @@ public class MachineCache {
     private static ItemStack controllerIcon(TileMultiblockMachineController controller) {
         Block block = controller.getWorld().getBlockState(controller.getPos()).getBlock();
         Item item = Item.getItemFromBlock(block);
-        return new ItemStack(item, 1, block.damageDropped(controller.getWorld().getBlockState(controller.getPos())));
+        int meta = block.damageDropped(controller.getWorld().getBlockState(controller.getPos()));
+        if (item == Items.AIR) {
+            DynamicMachine machine = controller.getFoundMachine();
+            if (machine == null && controller instanceof TileMachineController) {
+                machine = ((TileMachineController) controller).getParentMachine();
+            }
+            if (machine != null) {
+                Block controllerBlock = BlockController.getControllerWithMachine(machine);
+                if (controllerBlock != null) {
+                    item = Item.getItemFromBlock(controllerBlock);
+                    meta = controllerBlock.damageDropped(controllerBlock.getDefaultState());
+                }
+            }
+        }
+        return new ItemStack(item, 1, meta);
     }
 
     /**
