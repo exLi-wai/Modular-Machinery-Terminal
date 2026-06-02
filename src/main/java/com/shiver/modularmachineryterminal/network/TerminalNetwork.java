@@ -21,6 +21,7 @@ public final class TerminalNetwork {
         CHANNEL.registerMessage(PacketTeleportToMachine.Handler.class, PacketTeleportToMachine.class, id++, Side.SERVER);
         CHANNEL.registerMessage(PacketOpenMachineComponentGui.Handler.class, PacketOpenMachineComponentGui.class, id++, Side.SERVER);
         CHANNEL.registerMessage(PacketPrepareComponentGui.Handler.class, PacketPrepareComponentGui.class, id++, Side.CLIENT);
-        CHANNEL.registerMessage(PacketComponentGuiPager.Handler.class, PacketComponentGuiPager.class, id, Side.CLIENT);
+        CHANNEL.registerMessage(PacketComponentGuiPager.Handler.class, PacketComponentGuiPager.class, id++, Side.CLIENT);
+        CHANNEL.registerMessage(PacketCancelComponentGuiPrepare.Handler.class, PacketCancelComponentGuiPrepare.class, id, Side.SERVER);
     }
 }

@@ -111,10 +111,11 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
             int index = wrap(message.index, targets.size());
             TargetGui target = targets.get(index);
-            // Sync the target block and tile entity to the client so that
-            // Forge's client-side GUI handler can find the TileEntity.
-            RemoteContainerTracker.SyncContext syncContext = syncTargetToClient(player, world, target.pos);
             if (!message.prepared) {
+                // Sync the target block and tile entity to the client so that
+                // Forge's client-side GUI handler can find the TileEntity.
+                RemoteContainerTracker.SyncContext syncContext = syncTargetToClient(player, world, target.pos);
+                RemoteContainerTracker.prepare(player, message.key, syncContext);
                 TerminalNetwork.CHANNEL.sendTo(new PacketPrepareComponentGui(message.key, message.group, index, targets.size(), target.pos), player);
                 return;
             }
@@ -140,7 +141,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
             // the original container class so that instanceof checks in
             // MMCE/AE2 packet handlers (e.g. PktMEInputBusInvAction,
             // PacketInventoryAction) still work correctly.
-            RemoteContainerTracker.track(player, message.key, target.pos, syncContext);
+            RemoteContainerTracker.track(player, message.key, target.pos);
         }
 
         private static RemoteContainerTracker.SyncContext syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {

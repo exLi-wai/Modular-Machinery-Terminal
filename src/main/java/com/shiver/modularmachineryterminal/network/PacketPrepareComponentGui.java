@@ -85,6 +85,8 @@ public class PacketPrepareComponentGui implements IMessage {
             }
             if (ticks < 10) {
                 mc.addScheduledTask(new AwaitTile(message, ticks + 1));
+            } else {
+                TerminalNetwork.CHANNEL.sendToServer(new PacketCancelComponentGuiPrepare(message.key));
             }
         }
     }

@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RemoteContainerTracker {
 
     private static final Map<UUID, Session> tracked = new ConcurrentHashMap<>();
+    private static final Map<UUID, PendingSync> pending = new ConcurrentHashMap<>();
 
     /**
      * Begin tracking a player for remote container access.
@@ -47,8 +48,30 @@ public class RemoteContainerTracker {
      * @param targetPos   the position of the tile entity they are interacting with
      * @param syncContext client chunk restore context for this remote GUI
      */
-    public static void track(EntityPlayerMP player, MachineKey machineKey, BlockPos targetPos, SyncContext syncContext) {
-        if (player == null || machineKey == null || targetPos == null || syncContext == null || player.openContainer == player.inventoryContainer) {
+    public static void prepare(EntityPlayerMP player, MachineKey machineKey, SyncContext syncContext) {
+        if (player == null || machineKey == null || syncContext == null) {
+            return;
+        }
+        PendingSync oldPending = pending.remove(player.getUniqueID());
+        if (oldPending != null) {
+            oldPending.restoreClientChunk(player);
+        }
+        pending.put(player.getUniqueID(), new PendingSync(machineKey, syncContext));
+    }
+
+    public static void cancelPending(EntityPlayerMP player, MachineKey machineKey) {
+        if (player == null || machineKey == null) {
+            return;
+        }
+        PendingSync pendingSync = pending.get(player.getUniqueID());
+        if (pendingSync != null && pendingSync.machineKey.equals(machineKey)) {
+            pending.remove(player.getUniqueID());
+            pendingSync.restoreClientChunk(player);
+        }
+    }
+
+    public static void track(EntityPlayerMP player, MachineKey machineKey, BlockPos targetPos) {
+        if (player == null || machineKey == null || targetPos == null || player.openContainer == player.inventoryContainer) {
             return;
         }
         WorldServer world = player.server.getWorld(machineKey.dimension);
@@ -59,9 +82,13 @@ public class RemoteContainerTracker {
         if (targetTile == null) {
             return;
         }
+        PendingSync pendingSync = pending.remove(player.getUniqueID());
+        SyncContext syncContext = pendingSync != null && pendingSync.machineKey.equals(machineKey)
+                ? pendingSync.syncContext
+                : new SyncContext(player.dimension, targetPos.getX() >> 4, targetPos.getZ() >> 4, false);
         Session oldSession = tracked.remove(player.getUniqueID());
         if (oldSession != null) {
-            oldSession.restoreClientChunk(player);
+            oldSession.restoreClientChunk(player, syncContext);
         }
         tracked.put(player.getUniqueID(), new Session(machineKey, targetPos, targetTile.getClass(), player.openContainer, syncContext));
     }
@@ -118,6 +145,7 @@ public class RemoteContainerTracker {
 
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        pending.remove(event.player.getUniqueID());
         if (event.player instanceof EntityPlayerMP) {
             untrack((EntityPlayerMP) event.player);
         } else {
@@ -128,22 +156,22 @@ public class RemoteContainerTracker {
     private static void untrack(EntityPlayerMP player) {
         Session session = tracked.remove(player.getUniqueID());
         if (session != null) {
-            session.restoreClientChunk(player);
+            session.restoreClientChunk(player, null);
         }
     }
 
-    public static class SyncContext {
+    private static class PendingSync {
 
-        private final int clientDimension;
-        private final int chunkX;
-        private final int chunkZ;
-        private final boolean fakeChunkSent;
+        private final MachineKey machineKey;
+        private final SyncContext syncContext;
 
-        public SyncContext(int clientDimension, int chunkX, int chunkZ, boolean fakeChunkSent) {
-            this.clientDimension = clientDimension;
-            this.chunkX = chunkX;
-            this.chunkZ = chunkZ;
-            this.fakeChunkSent = fakeChunkSent;
+        private PendingSync(MachineKey machineKey, SyncContext syncContext) {
+            this.machineKey = machineKey;
+            this.syncContext = syncContext;
+        }
+
+        private void restoreClientChunk(EntityPlayerMP player) {
+            syncContext.restoreClientChunk(player, null);
         }
     }
 
@@ -181,17 +209,42 @@ public class RemoteContainerTracker {
                     && MachineAccess.canAccess(player, controller.getOwner(), true);
         }
 
-        private void restoreClientChunk(EntityPlayerMP player) {
-            if (player.dimension != syncContext.clientDimension) {
+        private void restoreClientChunk(EntityPlayerMP player, SyncContext replacement) {
+            syncContext.restoreClientChunk(player, replacement);
+        }
+    }
+
+    public static class SyncContext {
+
+        private final int clientDimension;
+        private final int chunkX;
+        private final int chunkZ;
+        private final boolean fakeChunkSent;
+
+        public SyncContext(int clientDimension, int chunkX, int chunkZ, boolean fakeChunkSent) {
+            this.clientDimension = clientDimension;
+            this.chunkX = chunkX;
+            this.chunkZ = chunkZ;
+            this.fakeChunkSent = fakeChunkSent;
+        }
+
+        private void restoreClientChunk(EntityPlayerMP player, SyncContext replacement) {
+            if (replacement != null
+                    && clientDimension == replacement.clientDimension
+                    && chunkX == replacement.chunkX
+                    && chunkZ == replacement.chunkZ) {
                 return;
             }
-            WorldServer world = player.server.getWorld(syncContext.clientDimension);
+            if (player.dimension != clientDimension) {
+                return;
+            }
+            WorldServer world = player.server.getWorld(clientDimension);
             if (world == null) {
                 return;
             }
-            boolean watchingNow = world.getPlayerChunkMap().isPlayerWatchingChunk(player, syncContext.chunkX, syncContext.chunkZ);
+            boolean watchingNow = world.getPlayerChunkMap().isPlayerWatchingChunk(player, chunkX, chunkZ);
             if (watchingNow) {
-                Chunk chunk = world.getChunkProvider().getLoadedChunk(syncContext.chunkX, syncContext.chunkZ);
+                Chunk chunk = world.getChunkProvider().getLoadedChunk(chunkX, chunkZ);
                 if (chunk == null) {
                     return;
                 }
@@ -204,8 +257,8 @@ public class RemoteContainerTracker {
                         player.connection.sendPacket(new SPacketUpdateTileEntity(tile.getPos(), 0, tile.getUpdateTag()));
                     }
                 }
-            } else if (syncContext.fakeChunkSent) {
-                player.connection.sendPacket(new SPacketUnloadChunk(syncContext.chunkX, syncContext.chunkZ));
+            } else if (fakeChunkSent) {
+                player.connection.sendPacket(new SPacketUnloadChunk(chunkX, chunkZ));
             }
         }
     }
