@@ -5,9 +5,13 @@ import com.shiver.modularmachineryterminal.common.MachineKey;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.inventory.Container;
+import net.minecraft.network.play.server.SPacketChunkData;
+import net.minecraft.network.play.server.SPacketUnloadChunk;
+import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.WorldServer;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
@@ -40,10 +44,11 @@ public class RemoteContainerTracker {
      *
      * @param player    the player who opened a remote container
      * @param machineKey the controller position of the source machine
-     * @param targetPos  the position of the tile entity they are interacting with
+     * @param targetPos   the position of the tile entity they are interacting with
+     * @param syncContext client chunk restore context for this remote GUI
      */
-    public static void track(EntityPlayerMP player, MachineKey machineKey, BlockPos targetPos) {
-        if (player == null || machineKey == null || targetPos == null || player.openContainer == player.inventoryContainer) {
+    public static void track(EntityPlayerMP player, MachineKey machineKey, BlockPos targetPos, SyncContext syncContext) {
+        if (player == null || machineKey == null || targetPos == null || syncContext == null || player.openContainer == player.inventoryContainer) {
             return;
         }
         WorldServer world = player.server.getWorld(machineKey.dimension);
@@ -54,7 +59,11 @@ public class RemoteContainerTracker {
         if (targetTile == null) {
             return;
         }
-        tracked.put(player.getUniqueID(), new Session(machineKey, targetPos, targetTile.getClass(), player.openContainer));
+        Session oldSession = tracked.remove(player.getUniqueID());
+        if (oldSession != null) {
+            oldSession.restoreClientChunk(player);
+        }
+        tracked.put(player.getUniqueID(), new Session(machineKey, targetPos, targetTile.getClass(), player.openContainer, syncContext));
     }
 
     /**
@@ -97,19 +106,45 @@ public class RemoteContainerTracker {
         }
 
         if (player.openContainer == player.inventoryContainer || player.openContainer != session.container) {
-            tracked.remove(id);
+            untrack(player);
             return;
         }
 
         if (!session.isValid(player)) {
             player.closeScreen();
-            tracked.remove(id);
+            untrack(player);
         }
     }
 
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        tracked.remove(event.player.getUniqueID());
+        if (event.player instanceof EntityPlayerMP) {
+            untrack((EntityPlayerMP) event.player);
+        } else {
+            tracked.remove(event.player.getUniqueID());
+        }
+    }
+
+    private static void untrack(EntityPlayerMP player) {
+        Session session = tracked.remove(player.getUniqueID());
+        if (session != null) {
+            session.restoreClientChunk(player);
+        }
+    }
+
+    public static class SyncContext {
+
+        private final int clientDimension;
+        private final int chunkX;
+        private final int chunkZ;
+        private final boolean fakeChunkSent;
+
+        public SyncContext(int clientDimension, int chunkX, int chunkZ, boolean fakeChunkSent) {
+            this.clientDimension = clientDimension;
+            this.chunkX = chunkX;
+            this.chunkZ = chunkZ;
+            this.fakeChunkSent = fakeChunkSent;
+        }
     }
 
     private static class Session {
@@ -118,12 +153,14 @@ public class RemoteContainerTracker {
         private final BlockPos targetPos;
         private final Class<?> targetType;
         private final Container container;
+        private final SyncContext syncContext;
 
-        private Session(MachineKey machineKey, BlockPos targetPos, Class<?> targetType, Container container) {
+        private Session(MachineKey machineKey, BlockPos targetPos, Class<?> targetType, Container container, SyncContext syncContext) {
             this.machineKey = machineKey;
             this.targetPos = targetPos;
             this.targetType = targetType;
             this.container = container;
+            this.syncContext = syncContext;
         }
 
         private boolean isValid(EntityPlayerMP player) {
@@ -142,6 +179,34 @@ public class RemoteContainerTracker {
             TileMultiblockMachineController controller = (TileMultiblockMachineController) controllerTile;
             return PacketOpenMachineComponentGui.Handler.hasTarget(controller, targetPos)
                     && MachineAccess.canAccess(player, controller.getOwner(), true);
+        }
+
+        private void restoreClientChunk(EntityPlayerMP player) {
+            if (player.dimension != syncContext.clientDimension) {
+                return;
+            }
+            WorldServer world = player.server.getWorld(syncContext.clientDimension);
+            if (world == null) {
+                return;
+            }
+            boolean watchingNow = world.getPlayerChunkMap().isPlayerWatchingChunk(player, syncContext.chunkX, syncContext.chunkZ);
+            if (watchingNow) {
+                Chunk chunk = world.getChunkProvider().getLoadedChunk(syncContext.chunkX, syncContext.chunkZ);
+                if (chunk == null) {
+                    return;
+                }
+                player.connection.sendPacket(new SPacketChunkData(chunk, 65535));
+                for (TileEntity tile : chunk.getTileEntityMap().values()) {
+                    SPacketUpdateTileEntity packet = tile.getUpdatePacket();
+                    if (packet != null) {
+                        player.connection.sendPacket(packet);
+                    } else {
+                        player.connection.sendPacket(new SPacketUpdateTileEntity(tile.getPos(), 0, tile.getUpdateTag()));
+                    }
+                }
+            } else if (syncContext.fakeChunkSent) {
+                player.connection.sendPacket(new SPacketUnloadChunk(syncContext.chunkX, syncContext.chunkZ));
+            }
         }
     }
 }

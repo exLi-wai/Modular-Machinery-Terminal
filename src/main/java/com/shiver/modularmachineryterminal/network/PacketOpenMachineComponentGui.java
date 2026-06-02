@@ -15,6 +15,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.network.play.server.SPacketBlockChange;
 import net.minecraft.network.play.server.SPacketChunkData;
 import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
@@ -112,7 +113,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
             TargetGui target = targets.get(index);
             // Sync the target block and tile entity to the client so that
             // Forge's client-side GUI handler can find the TileEntity.
-            syncTargetToClient(player, world, target.pos);
+            RemoteContainerTracker.SyncContext syncContext = syncTargetToClient(player, world, target.pos);
             if (!message.prepared) {
                 TerminalNetwork.CHANNEL.sendTo(new PacketPrepareComponentGui(message.key, message.group, index, targets.size(), target.pos), player);
                 return;
@@ -139,14 +140,18 @@ public class PacketOpenMachineComponentGui implements IMessage {
             // the original container class so that instanceof checks in
             // MMCE/AE2 packet handlers (e.g. PktMEInputBusInvAction,
             // PacketInventoryAction) still work correctly.
-            RemoteContainerTracker.track(player, message.key, target.pos);
+            RemoteContainerTracker.track(player, message.key, target.pos, syncContext);
         }
 
-        private static void syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {
-            if (player.dimension == world.provider.getDimension()) {
-                // Same dimension: send full chunk data.
-                Chunk chunk = world.getChunk(pos);
-                player.connection.sendPacket(new SPacketChunkData(chunk, 65535));
+        private static RemoteContainerTracker.SyncContext syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {
+            WorldServer playerWorld = player.getServerWorld();
+            int chunkX = pos.getX() >> 4;
+            int chunkZ = pos.getZ() >> 4;
+            boolean watching = playerWorld.getPlayerChunkMap().isPlayerWatchingChunk(player, chunkX, chunkZ);
+            boolean fakeChunkSent = false;
+
+            if (player.dimension == world.provider.getDimension() && watching) {
+                player.connection.sendPacket(new SPacketBlockChange(world, pos));
             } else {
                 // Cross-dimension: we cannot send the real chunk because
                 // SPacketChunkData encodes sky light based on the source
@@ -158,8 +163,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
                 // Solution: build a minimal fake chunk belonging to the
                 // PLAYER's world (so sky light matches) that contains only
                 // the target block and its tile entity data.
-                WorldServer playerWorld = player.getServerWorld();
-                Chunk fakeChunk = new Chunk(playerWorld, pos.getX() >> 4, pos.getZ() >> 4);
+                Chunk fakeChunk = new Chunk(playerWorld, chunkX, chunkZ);
                 IBlockState targetState = world.getBlockState(pos);
                 int sectionIndex = pos.getY() >> 4;
                 ExtendedBlockStorage[] storage = fakeChunk.getBlockStorageArray();
@@ -174,6 +178,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
                     fakeChunk.getTileEntityMap().put(pos, targetTe);
                 }
                 player.connection.sendPacket(new SPacketChunkData(fakeChunk, 65535));
+                fakeChunkSent = true;
             }
             TileEntity tile = world.getTileEntity(pos);
             if (tile != null) {
@@ -184,6 +189,7 @@ public class PacketOpenMachineComponentGui implements IMessage {
                     player.connection.sendPacket(new SPacketUpdateTileEntity(pos, 0, tile.getUpdateTag()));
                 }
             }
+            return new RemoteContainerTracker.SyncContext(player.dimension, chunkX, chunkZ, fakeChunkSent);
         }
 
         private static List<TargetGui> targets(TileMultiblockMachineController controller, ComponentGuiGroup group) {

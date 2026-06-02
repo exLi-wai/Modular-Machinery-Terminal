@@ -154,7 +154,9 @@ public class GuiTerminal extends GuiScreen {
             }
             for (int i = 2; i < 8; i++) {
                 if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, i), actionButtonSize(), actionButtonSize())) {
-                    TerminalNetwork.CHANNEL.sendToServer(new PacketOpenMachineComponentGui(machine.key, componentGroup(i), 0));
+                    if (machine.loaded) {
+                        TerminalNetwork.CHANNEL.sendToServer(new PacketOpenMachineComponentGui(machine.key, componentGroup(i), 0));
+                    }
                     return;
                 }
             }
@@ -286,18 +288,23 @@ public class GuiTerminal extends GuiScreen {
         int x = actionButtonX(left);
         for (int i = 0; i < 8; i++) {
             boolean hovered = inside(mouseX, mouseY, x, actionButtonY(top, i), actionButtonSize(), actionButtonSize());
-            drawIconButton(x, actionButtonY(top, i), actionButtonSize(), actionButtonSize(), actionButtonText(i, machine), hovered);
+            drawIconButton(x, actionButtonY(top, i), actionButtonSize(), actionButtonSize(), actionButtonText(i, machine), hovered, actionEnabled(i, machine));
         }
     }
 
-    private void drawIconButton(int x, int y, int width, int height, String text, boolean hovered) {
-        int border = hovered ? 0xFF8DA5B8 : 0xFF5E6973;
-        int fill = hovered ? 0xFF394650 : 0xFF273039;
+    private void drawIconButton(int x, int y, int width, int height, String text, boolean hovered, boolean enabled) {
+        int border = !enabled ? 0xFF434A50 : (hovered ? 0xFF8DA5B8 : 0xFF5E6973);
+        int fill = !enabled ? 0xFF20262B : (hovered ? 0xFF394650 : 0xFF273039);
+        int color = enabled ? 0xFFD8DEE5 : 0xFF6F7982;
         drawRect(x, y, x + width, y + height, border);
         drawRect(x + 1, y + 1, x + width - 1, y + height - 1, fill);
         int textWidth = fontRenderer.getStringWidth(text);
         if (textWidth > 0) textWidth -= 1;
-        fontRenderer.drawString(text, x + (width - textWidth) / 2, y + 2, 0xFFD8DEE5);
+        fontRenderer.drawString(text, x + (width - textWidth) / 2, y + 2, color);
+    }
+
+    private boolean actionEnabled(int index, MachineInfo machine) {
+        return index < 2 || machine == null || machine.loaded;
     }
 
     private String actionButtonText(int index, MachineInfo machine) {
@@ -322,6 +329,10 @@ public class GuiTerminal extends GuiScreen {
     }
 
     private String actionTooltip(int index) {
+        MachineInfo machine = selectedMachine();
+        if (index >= 2 && machine != null && !machine.loaded) {
+            return I18n.format("gui.modular_machinery_terminal.machine_unloaded");
+        }
         if (index == 1) {
             if (!TerminalConfig.clientTeleportEnabled) {
                 return I18n.format("gui.modular_machinery_terminal.teleport_disabled");
