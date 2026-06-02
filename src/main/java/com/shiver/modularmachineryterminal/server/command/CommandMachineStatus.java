@@ -40,7 +40,9 @@ public class CommandMachineStatus extends CommandBase {
         EntityPlayerMP player = args.length == 1 ? getPlayer(server, sender, args[0]) : getCommandSenderAsPlayer(sender);
         List<TileMultiblockMachineController> controllers = MachineList.loadedMachines(player);
         for (TileMultiblockMachineController controller : controllers) {
-            PlayerLoggedInHandler.sendMachineInfo(player, controller);
+            if (!controller.isStructureFormed()) {
+                PlayerLoggedInHandler.sendMachineInfo(player, controller);
+            }
         }
     }
 

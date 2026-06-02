@@ -271,6 +271,9 @@ public class MachineCache {
 
     private static boolean isCachedPositionLoaded(MinecraftServer server, MachineKey key) {
         WorldServer world = server.getWorld(key.dimension);
+        if (world == null) {
+            return false;
+        }
         int chunkX = key.pos.getX() >> 4;
         int chunkZ = key.pos.getZ() >> 4;
         return world.getChunkProvider().getLoadedChunk(chunkX, chunkZ) != null;
