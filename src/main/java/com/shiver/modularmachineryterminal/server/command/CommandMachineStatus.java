@@ -1,7 +1,7 @@
 package com.shiver.modularmachineryterminal.server.command;
 
 import com.shiver.modularmachineryterminal.common.handler.PlayerLoggedInHandler;
-import com.shiver.modularmachineryterminal.server.MachineList;
+import com.shiver.modularmachineryterminal.server.MachineLoadingList;
 import hellfirepvp.modularmachinery.common.tiles.base.TileMultiblockMachineController;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
@@ -38,7 +38,7 @@ public class CommandMachineStatus extends CommandBase {
         }
 
         EntityPlayerMP player = args.length == 1 ? getPlayer(server, sender, args[0]) : getCommandSenderAsPlayer(sender);
-        List<TileMultiblockMachineController> controllers = MachineList.loadedMachines(player);
+        List<TileMultiblockMachineController> controllers = MachineLoadingList.loadedMachines(player);
         for (TileMultiblockMachineController controller : controllers) {
             if (!controller.isStructureFormed()) {
                 PlayerLoggedInHandler.sendMachineInfo(player, controller);
