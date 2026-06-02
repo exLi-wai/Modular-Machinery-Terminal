@@ -6,6 +6,7 @@ import com.shiver.modularmachineryterminal.common.TerminalConfig;
 import com.shiver.modularmachineryterminal.network.RemoteContainerTracker;
 import com.shiver.modularmachineryterminal.network.TerminalNetwork;
 import com.shiver.modularmachineryterminal.server.MachineCache;
+import com.shiver.modularmachineryterminal.modularmachinery_terminal.Tags;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.SidedProxy;
@@ -20,9 +21,9 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 )
 public class ModularMachineryTerminal {
 
-    public static final String MOD_ID = "modularmachinery_terminal";
-    public static final String MOD_NAME = "Modular Machinery Terminal";
-    public static final String VERSION = "1.0.0";
+    public static final String MOD_ID = Tags.MOD_ID;
+    public static final String MOD_NAME = Tags.MOD_NAME;
+    public static final String VERSION = Tags.VERSION;
 
     @Mod.Instance(MOD_ID)
     public static ModularMachineryTerminal INSTANCE;
