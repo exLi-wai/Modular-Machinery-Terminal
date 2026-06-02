@@ -16,7 +16,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
         modid = ModularMachineryTerminal.MOD_ID,
         name = ModularMachineryTerminal.MOD_NAME,
         version = ModularMachineryTerminal.VERSION,
-        dependencies = "required-after:modularmachinery"
+        dependencies = "required-after:modularmachinery;required-after:mixinbooter"
 )
 public class ModularMachineryTerminal {
 
