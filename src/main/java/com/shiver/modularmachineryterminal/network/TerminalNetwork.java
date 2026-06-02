@@ -9,9 +9,15 @@ public final class TerminalNetwork {
 
     public static final SimpleNetworkWrapper CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel(ModularMachineryTerminal.MOD_ID);
 
+    /**
+     * 创建 TerminalNetwork 实例。
+     */
     private TerminalNetwork() {
     }
 
+    /**
+     * 执行模组初始化阶段的注册逻辑。
+     */
     public static void init() {
         int id = 0;
         CHANNEL.registerMessage(PacketRequestFullList.Handler.class, PacketRequestFullList.class, id++, Side.SERVER);

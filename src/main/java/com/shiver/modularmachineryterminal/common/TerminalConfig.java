@@ -16,11 +16,18 @@ public class TerminalConfig {
 
     private static Configuration config;
 
+    /**
+     * 加载终端配置文件。
+     * @param file 目标文件
+     */
     public static void load(File file) {
         config = new Configuration(file);
         sync();
     }
 
+    /**
+     * 同步终端配置到 Forge 配置系统。
+     */
     public static void sync() {
         if (config == null) {
             return;
@@ -53,11 +60,22 @@ public class TerminalConfig {
         updateClientConfig(teleportEnabled, teleportRequiredGameStage, teamAccessEnabled);
     }
 
+    /**
+     * 更新客户端传送相关配置。
+     * @param enabled 按钮是否可用
+     * @param requiredGameStage 传送所需阶段
+     */
     public static void updateClientTeleportConfig(boolean enabled, String requiredGameStage) {
         clientTeleportEnabled = enabled;
         clientTeleportRequiredGameStage = requiredGameStage == null ? "" : requiredGameStage.trim();
     }
 
+    /**
+     * 更新客户端终端功能配置。
+     * @param teleportEnabled 客户端传送是否启用
+     * @param requiredGameStage 传送所需阶段
+     * @param teamAccessEnabled 团队访问是否启用
+     */
     public static void updateClientConfig(boolean teleportEnabled, String requiredGameStage, boolean teamAccessEnabled) {
         updateClientTeleportConfig(teleportEnabled, requiredGameStage);
         clientTeamAccessEnabled = teamAccessEnabled;

@@ -33,6 +33,10 @@ public class ModularMachineryTerminal {
     )
     public static CommonProxy proxy;
 
+    /**
+     * 执行模组预初始化阶段的注册逻辑。
+     * @param event 触发该逻辑的事件对象
+     */
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         TerminalConfig.load(event.getSuggestedConfigurationFile());
@@ -41,6 +45,10 @@ public class ModularMachineryTerminal {
         proxy.preInit();
     }
 
+    /**
+     * 执行模组初始化阶段的注册逻辑。
+     * @param event 触发该逻辑的事件对象
+     */
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(new MachineCache());

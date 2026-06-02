@@ -11,6 +11,9 @@ import net.minecraftforge.client.model.ModelLoader;
 
 public class ClientProxy extends CommonProxy {
 
+    /**
+     * 执行模组预初始化阶段的注册逻辑。
+     */
     @Override
     public void preInit() {
         ModelLoader.setCustomModelResourceLocation(
@@ -21,6 +24,9 @@ public class ClientProxy extends CommonProxy {
         MinecraftForge.EVENT_BUS.register(new ComponentGuiPager());
     }
 
+    /**
+     * 在当前环境中打开终端界面。
+     */
     @Override
     public void openTerminalGui() {
         Minecraft.getMinecraft().displayGuiScreen(new GuiTerminal());

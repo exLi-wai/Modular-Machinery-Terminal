@@ -10,6 +10,12 @@ public class GameStagesCompat {
     private static Method hasStageMethod;
     private static boolean searched;
 
+    /**
+     * 判断玩家是否拥有指定 GameStages 阶段。
+     * @param player 目标玩家
+     * @param stage stage 参数
+     * @return 条件成立时返回 true，否则返回 false
+     */
     public static boolean hasStage(EntityPlayer player, String stage) {
         if (player == null || stage == null || stage.trim().isEmpty()) {
             return true;
@@ -30,6 +36,10 @@ public class GameStagesCompat {
         }
     }
 
+    /**
+     * 执行 has stage method 相关逻辑。
+     * @return 方法执行结果
+     */
     private static Method hasStageMethod() {
         if (!searched) {
             searched = true;

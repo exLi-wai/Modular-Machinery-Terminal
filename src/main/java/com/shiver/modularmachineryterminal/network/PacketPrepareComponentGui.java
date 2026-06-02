@@ -21,9 +21,20 @@ public class PacketPrepareComponentGui implements IMessage {
     private int total;
     private BlockPos targetPos;
 
+    /**
+     * 创建 PacketPrepareComponentGui 实例。
+     */
     public PacketPrepareComponentGui() {
     }
 
+    /**
+     * 创建 PacketPrepareComponentGui 实例。
+     * @param key 目标机器键
+     * @param group 组件 GUI 分组
+     * @param index 目标索引
+     * @param total 总数量
+     * @param targetPos 目标组件位置
+     */
     public PacketPrepareComponentGui(MachineKey key, ComponentGuiGroup group, int index, int total, BlockPos targetPos) {
         this.key = key;
         this.group = group;
@@ -32,6 +43,10 @@ public class PacketPrepareComponentGui implements IMessage {
         this.targetPos = targetPos;
     }
 
+    /**
+     * 从网络缓冲区读取该消息的数据。
+     * @param buf 网络字节缓冲区
+     */
     @Override
     public void fromBytes(ByteBuf buf) {
         PacketBuffer buffer = new PacketBuffer(buf);
@@ -42,6 +57,10 @@ public class PacketPrepareComponentGui implements IMessage {
         targetPos = buffer.readBlockPos();
     }
 
+    /**
+     * 将该消息的数据写入网络缓冲区。
+     * @param buf 网络字节缓冲区
+     */
     @Override
     public void toBytes(ByteBuf buf) {
         PacketBuffer buffer = new PacketBuffer(buf);
@@ -54,6 +73,12 @@ public class PacketPrepareComponentGui implements IMessage {
 
     public static class Handler implements IMessageHandler<PacketPrepareComponentGui, IMessage> {
 
+        /**
+         * 处理收到的网络消息，并把实际逻辑切换到对应线程执行。
+         * @param message 收到的网络消息
+         * @param ctx 网络消息上下文
+         * @return 需要回复的网络消息，通常为 null
+         */
         @Override
         public IMessage onMessage(PacketPrepareComponentGui message, MessageContext ctx) {
             Minecraft.getMinecraft().addScheduledTask(new AwaitTile(message, 0));
@@ -66,11 +91,19 @@ public class PacketPrepareComponentGui implements IMessage {
         private final PacketPrepareComponentGui message;
         private final int ticks;
 
+        /**
+         * 创建 AwaitTile 实例。
+         * @param message 收到的网络消息
+         * @param ticks ticks 参数
+         */
         private AwaitTile(PacketPrepareComponentGui message, int ticks) {
             this.message = message;
             this.ticks = ticks;
         }
 
+        /**
+         * 执行 run 相关逻辑。
+         */
         @Override
         public void run() {
             Minecraft mc = Minecraft.getMinecraft();

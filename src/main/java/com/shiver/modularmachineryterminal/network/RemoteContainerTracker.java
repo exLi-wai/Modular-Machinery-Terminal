@@ -21,32 +21,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Tracks players who have remotely-opened containers via the terminal.
- * <p>
- * The actual distance check bypass is handled by Mixins:
- * <ul>
- *   <li>{@code MixinEntityPlayerMP} — bypasses vanilla's
- *       {@code Container.canInteractWith()} check</li>
- *   <li>{@code MixinMMCEEventHandler} — bypasses MMCE's
- *       {@code EventHandler.checkTERange()} check</li>
- * </ul>
- * <p>
- * The tick handler closes the remote GUI when the tracked controller or
- * target tile entity is no longer valid.
- */
 public class RemoteContainerTracker {
 
     private static final Map<UUID, Session> tracked = new ConcurrentHashMap<>();
     private static final Map<UUID, PendingSync> pending = new ConcurrentHashMap<>();
 
     /**
-     * Begin tracking a player for remote container access.
-     *
-     * @param player    the player who opened a remote container
-     * @param machineKey the controller position of the source machine
-     * @param targetPos   the position of the tile entity they are interacting with
-     * @param syncContext client chunk restore context for this remote GUI
+     * 记录远程组件 GUI 打开前的客户端同步上下文。
+     * @param player 目标玩家
+     * @param machineKey 目标机器键
+     * @param syncContext 客户端同步上下文
      */
     public static void prepare(EntityPlayerMP player, MachineKey machineKey, SyncContext syncContext) {
         if (player == null || machineKey == null || syncContext == null) {
@@ -59,6 +43,11 @@ public class RemoteContainerTracker {
         pending.put(player.getUniqueID(), new PendingSync(machineKey, syncContext));
     }
 
+    /**
+     * 取消玩家尚未完成的远程组件 GUI 准备状态。
+     * @param player 目标玩家
+     * @param machineKey 目标机器键
+     */
     public static void cancelPending(EntityPlayerMP player, MachineKey machineKey) {
         if (player == null || machineKey == null) {
             return;
@@ -70,6 +59,12 @@ public class RemoteContainerTracker {
         }
     }
 
+    /**
+     * 开始追踪玩家当前打开的远程组件容器。
+     * @param player 目标玩家
+     * @param machineKey 目标机器键
+     * @param targetPos 目标组件位置
+     */
     public static void track(EntityPlayerMP player, MachineKey machineKey, BlockPos targetPos) {
         if (player == null || machineKey == null || targetPos == null || player.openContainer == player.inventoryContainer) {
             return;
@@ -94,17 +89,30 @@ public class RemoteContainerTracker {
     }
 
     /**
-     * Stop tracking a player.
+     * 停止追踪指定玩家的远程容器状态。
+     * @param playerId 玩家 UUID
      */
     public static void untrack(UUID playerId) {
         tracked.remove(playerId);
     }
 
+    /**
+     * 判断容器是否为当前追踪的远程组件容器。
+     * @param playerId 玩家 UUID
+     * @param container 目标容器
+     * @return 条件成立时返回 true，否则返回 false
+     */
     public static boolean isTrackedContainer(UUID playerId, Container container) {
         Session session = tracked.get(playerId);
         return session != null && session.container == container;
     }
 
+    /**
+     * 判断方块实体是否为当前追踪的远程组件目标。
+     * @param playerId 玩家 UUID
+     * @param tile 目标方块实体
+     * @return 条件成立时返回 true，否则返回 false
+     */
     public static boolean isTrackedTarget(UUID playerId, TileEntity tile) {
         Session session = tracked.get(playerId);
         return session != null && tile != null
@@ -114,8 +122,8 @@ public class RemoteContainerTracker {
     }
 
     /**
-     * Detects when a tracked player closes their container and
-     * automatically removes them from the tracker.
+     * 在玩家 tick 中临时修正位置以通过远程容器距离检查。
+     * @param event 触发该逻辑的事件对象
      */
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
@@ -143,6 +151,10 @@ public class RemoteContainerTracker {
         }
     }
 
+    /**
+     * 在玩家退出时清理远程容器追踪状态。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         pending.remove(event.player.getUniqueID());
@@ -153,6 +165,10 @@ public class RemoteContainerTracker {
         }
     }
 
+    /**
+     * 停止追踪指定玩家的远程容器状态。
+     * @param player 目标玩家
+     */
     private static void untrack(EntityPlayerMP player) {
         Session session = tracked.remove(player.getUniqueID());
         if (session != null) {
@@ -165,11 +181,20 @@ public class RemoteContainerTracker {
         private final MachineKey machineKey;
         private final SyncContext syncContext;
 
+        /**
+         * 创建 PendingSync 实例。
+         * @param machineKey 目标机器键
+         * @param syncContext 客户端同步上下文
+         */
         private PendingSync(MachineKey machineKey, SyncContext syncContext) {
             this.machineKey = machineKey;
             this.syncContext = syncContext;
         }
 
+        /**
+         * 按同步上下文恢复客户端区块显示状态。
+         * @param player 目标玩家
+         */
         private void restoreClientChunk(EntityPlayerMP player) {
             syncContext.restoreClientChunk(player, null);
         }
@@ -183,6 +208,14 @@ public class RemoteContainerTracker {
         private final Container container;
         private final SyncContext syncContext;
 
+        /**
+         * 创建 Session 实例。
+         * @param machineKey 目标机器键
+         * @param targetPos 目标组件位置
+         * @param targetType targetType 参数
+         * @param container 目标容器
+         * @param syncContext 客户端同步上下文
+         */
         private Session(MachineKey machineKey, BlockPos targetPos, Class<?> targetType, Container container, SyncContext syncContext) {
             this.machineKey = machineKey;
             this.targetPos = targetPos;
@@ -191,6 +224,11 @@ public class RemoteContainerTracker {
             this.syncContext = syncContext;
         }
 
+        /**
+         * 判断远程容器会话是否仍然有效。
+         * @param player 目标玩家
+         * @return 条件成立时返回 true，否则返回 false
+         */
         private boolean isValid(EntityPlayerMP player) {
             WorldServer world = player.server.getWorld(machineKey.dimension);
             if (world == null) {
@@ -209,6 +247,11 @@ public class RemoteContainerTracker {
                     && MachineAccess.canAccess(player, controller.getOwner(), true);
         }
 
+        /**
+         * 按同步上下文恢复客户端区块显示状态。
+         * @param player 目标玩家
+         * @param replacement 替换用同步上下文
+         */
         private void restoreClientChunk(EntityPlayerMP player, SyncContext replacement) {
             syncContext.restoreClientChunk(player, replacement);
         }
@@ -221,6 +264,13 @@ public class RemoteContainerTracker {
         private final int chunkZ;
         private final boolean fakeChunkSent;
 
+        /**
+         * 创建 SyncContext 实例。
+         * @param clientDimension 客户端维度 ID
+         * @param chunkX 区块 X 坐标
+         * @param chunkZ 区块 Z 坐标
+         * @param fakeChunkSent 是否已发送伪区块
+         */
         public SyncContext(int clientDimension, int chunkX, int chunkZ, boolean fakeChunkSent) {
             this.clientDimension = clientDimension;
             this.chunkX = chunkX;
@@ -228,6 +278,11 @@ public class RemoteContainerTracker {
             this.fakeChunkSent = fakeChunkSent;
         }
 
+        /**
+         * 按同步上下文恢复客户端区块显示状态。
+         * @param player 目标玩家
+         * @param replacement 替换用同步上下文
+         */
         private void restoreClientChunk(EntityPlayerMP player, SyncContext replacement) {
             if (replacement != null
                     && clientDimension == replacement.clientDimension

@@ -27,6 +27,14 @@ public class ComponentGuiPager {
     private static BlockPos targetPos;
     private static boolean openedFromTerminal = false;
 
+    /**
+     * 设置当前客户端组件 GUI 翻页上下文。
+     * @param newKey 新的机器键
+     * @param newGroup 新的组件 GUI 分组
+     * @param newIndex 新的页索引
+     * @param newTotal 新的总页数
+     * @param newTargetPos 新的目标组件位置
+     */
     public static void set(MachineKey newKey, ComponentGuiGroup newGroup, int newIndex, int newTotal, BlockPos newTargetPos) {
         key = newKey;
         group = newGroup;
@@ -36,9 +44,11 @@ public class ComponentGuiPager {
         openedFromTerminal = true;
     }
 
+    /**
+     * 清空当前客户端组件 GUI 翻页上下文。
+     */
     public static void clear() {
-        // Clear terminal-opened pager context so manually opened MMCE GUIs
-        // don't inherit stale machine and component positions.
+
         key = null;
         group = null;
         index = 0;
@@ -47,12 +57,14 @@ public class ComponentGuiPager {
         openedFromTerminal = false;
     }
 
+    /**
+     * 在 GUI 打开事件中维护远程组件 GUI 上下文。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onGuiOpen(net.minecraftforge.client.event.GuiOpenEvent event) {
         if (openedFromTerminal) {
             if (event.getGui() == null) {
-                // Closing a remote component GUI returns the player to the
-                // terminal instead of dropping them back to the world.
                 event.setGui(new GuiTerminal());
                 clear();
             } else if (!(event.getGui() instanceof GuiContainer)) {
@@ -63,6 +75,10 @@ public class ComponentGuiPager {
         }
     }
 
+    /**
+     * 在 GUI 初始化后注入组件翻页按钮。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onInit(GuiScreenEvent.InitGuiEvent.Post event) {
         if (!active(event.getGui())) {
@@ -84,6 +100,11 @@ public class ComponentGuiPager {
         event.getButtonList().add(new GuiButton(NEXT_ID, centerX + textWidth / 2 + 6, y, 20, 20, ">"));
     }
 
+    /**
+     * 处理组件 GUI 翻页按钮点击。
+     * @param event 触发该逻辑的事件对象
+     * @throws IOException 读写输入或输出失败时抛出
+     */
     @SubscribeEvent
     public void onAction(GuiScreenEvent.ActionPerformedEvent.Pre event) throws IOException {
         if (!active(event.getGui())) {
@@ -98,6 +119,10 @@ public class ComponentGuiPager {
         }
     }
 
+    /**
+     * 在组件 GUI 上绘制当前页码。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onDraw(GuiScreenEvent.DrawScreenEvent.Post event) {
         if (!active(event.getGui())) {
@@ -113,6 +138,11 @@ public class ComponentGuiPager {
         mc.fontRenderer.drawStringWithShadow(text, event.getGui().width / 2 - mc.fontRenderer.getStringWidth(text) / 2, guiTop - 16, 0xFFFFFF);
     }
 
+    /**
+     * 判断当前 GUI 是否处于终端组件翻页上下文中。
+     * @param gui 目标 GUI 对象
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private static boolean active(Object gui) {
         if (key == null || group == null || total <= 1 || !(gui instanceof GuiContainer)) {
             return false;
@@ -123,6 +153,14 @@ public class ComponentGuiPager {
                 || name.startsWith("kport.modularmagic.client.gui.");
     }
 
+    /**
+     * 通过反射读取 GUI 布局字段。
+     * @param gui 目标 GUI 对象
+     * @param name 目标名称
+     * @param obfName obfName 参数
+     * @param def def 参数
+     * @return 计算得到的数值
+     */
     private static int getField(GuiContainer gui, String name, String obfName, int def) {
         try {
             Class<?> c = GuiContainer.class;

@@ -24,6 +24,10 @@ public class MachineInfo {
     public final List<ThreadInfo> threads = new ArrayList<>();
     public final List<SmartInterfaceInfo> smartInterfaces = new ArrayList<>();
 
+    /**
+     * 复制机器基础信息，不包含线程等动态明细。
+     * @return 方法执行结果
+     */
     public MachineInfo copyBasic() {
         MachineInfo copy = new MachineInfo();
         copy.key = key;
@@ -43,6 +47,10 @@ public class MachineInfo {
         return copy;
     }
 
+    /**
+     * 将当前对象的数据写入目标缓冲区。
+     * @param buffer 网络数据缓冲区
+     */
     public void write(PacketBuffer buffer) {
         key.write(buffer);
         buffer.writeString(name);
@@ -67,6 +75,11 @@ public class MachineInfo {
         }
     }
 
+    /**
+     * 从目标缓冲区读取并创建对象。
+     * @param buffer 网络数据缓冲区
+     * @return 方法执行结果
+     */
     public static MachineInfo read(PacketBuffer buffer) {
         MachineInfo info = new MachineInfo();
         info.key = MachineKey.read(buffer);

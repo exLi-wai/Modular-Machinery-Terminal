@@ -63,11 +63,19 @@ public class MachineCache {
     private static int lastDiscoveryScanTick = -DISCOVERY_SCAN_INTERVAL_TICKS;
     private static MinecraftServer loadedServer;
 
+    /**
+     * 在机器 tick 时刷新该机器的缓存数据。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onMachineTick(MachineTickEvent event) {
         update(event.getController(), true);
     }
 
+    /**
+     * 在方块破坏时移除对应位置的机器缓存。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onBlockBreak(BlockEvent.BreakEvent event) {
         if (event.getWorld() == null || event.getWorld().isRemote) {
@@ -78,6 +86,10 @@ public class MachineCache {
         discoveryDirty = true;
     }
 
+    /**
+     * 在方块放置后安排扫描该位置的机器控制器。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onBlockPlace(BlockEvent.PlaceEvent event) {
         if (event.getWorld() == null || event.getWorld().isRemote) {
@@ -86,6 +98,10 @@ public class MachineCache {
         scheduleTrackPosition((WorldServer) event.getWorld(), event.getPos());
     }
 
+    /**
+     * 在多个方块放置后安排扫描所有相关位置。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onMultiBlockPlace(BlockEvent.MultiPlaceEvent event) {
         if (event.getWorld() == null || event.getWorld().isRemote) {
@@ -97,6 +113,10 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 在区块加载时扫描其中的机器控制器并校验持久化数据。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
         if (!(event.getWorld() instanceof WorldServer) || event.getWorld().isRemote || event.getChunk() == null) {
@@ -112,6 +132,10 @@ public class MachineCache {
         });
     }
 
+    /**
+     * 在区块卸载时把区块内缓存机器标记为未加载。
+     * @param event 触发该逻辑的事件对象
+     */
     @SubscribeEvent
     public void onChunkUnload(ChunkEvent.Unload event) {
         if (event.getWorld() == null || event.getWorld().isRemote || event.getChunk() == null) {
@@ -129,6 +153,12 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 为指定玩家创建完整机器列表网络包。
+     * @param player 目标玩家
+     * @param includeTeamControllers 是否包含团队成员拥有的控制器
+     * @return 符合条件的列表
+     */
     public static PacketFullList createFullListPacket(EntityPlayerMP player, boolean includeTeamControllers) {
         MinecraftServer server = player.getServer();
         loadPersistedIfNeeded(server);
@@ -143,6 +173,13 @@ public class MachineCache {
         return new PacketFullList(createSummary(player, includeTeamControllers), machines);
     }
 
+    /**
+     * 为指定玩家创建所选机器的动态刷新网络包。
+     * @param player 目标玩家
+     * @param keys 需要刷新的机器键列表
+     * @param includeTeamControllers 是否包含团队成员拥有的控制器
+     * @return 构造好的网络包
+     */
     public static PacketDynamic createDynamicPacket(EntityPlayerMP player, List<MachineKey> keys, boolean includeTeamControllers) {
         MinecraftServer server = player.getServer();
         loadPersistedIfNeeded(server);
@@ -163,6 +200,12 @@ public class MachineCache {
         return new PacketDynamic(createSummary(player, includeTeamControllers), machines, removed);
     }
 
+    /**
+     * 统计指定玩家可见机器的汇总信息。
+     * @param player 目标玩家
+     * @param includeTeamControllers 是否包含团队成员拥有的控制器
+     * @return 方法执行结果
+     */
     private static SummaryInfo createSummary(EntityPlayerMP player, boolean includeTeamControllers) {
         SummaryInfo summary = new SummaryInfo();
         for (CachedMachine cached : CACHE.values()) {
@@ -184,6 +227,11 @@ public class MachineCache {
         return summary;
     }
 
+    /**
+     * 在达到扫描间隔或强制刷新时扫描已加载机器。
+     * @param server 当前服务器实例
+     * @param force 是否强制刷新
+     */
     private static void refreshLoadedMachinesIfDue(MinecraftServer server, boolean force) {
         if (server == null) {
             return;
@@ -198,6 +246,10 @@ public class MachineCache {
         discoveryDirty = false;
     }
 
+    /**
+     * 扫描服务器中所有已加载世界并刷新机器缓存。
+     * @param server 当前服务器实例
+     */
     private static void refreshLoadedMachines(MinecraftServer server) {
         Set<MachineKey> foundLoaded = new HashSet<>();
 
@@ -224,6 +276,11 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 扫描指定世界中的已加载区块和方块实体。
+     * @param world 目标世界
+     * @param foundLoaded 用于记录已发现加载机器的集合
+     */
     private static void scanWorld(WorldServer world, Set<MachineKey> foundLoaded) {
         for (Chunk chunk : new ArrayList<>(world.getChunkProvider().getLoadedChunks())) {
             scanChunk(world, chunk, foundLoaded);
@@ -234,6 +291,12 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 扫描指定区块中的方块实体。
+     * @param world 目标世界
+     * @param chunk 目标区块
+     * @param foundLoaded 用于记录已发现加载机器的集合
+     */
     private static void scanChunk(WorldServer world, Chunk chunk, Set<MachineKey> foundLoaded) {
         if (world == null || chunk == null) {
             return;
@@ -243,6 +306,11 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 如果方块实体是机器控制器，则写入机器缓存。
+     * @param tile 目标方块实体
+     * @param foundLoaded 用于记录已发现加载机器的集合
+     */
     private static void trackTile(TileEntity tile, Set<MachineKey> foundLoaded) {
         if (!(tile instanceof TileMultiblockMachineController)) {
             return;
@@ -259,6 +327,10 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 把缓存机器标记为未加载并清空动态状态。
+     * @param cached 缓存机器对象
+     */
     private static void markUnloaded(CachedMachine cached) {
         if (cached == null || cached.info == null) {
             return;
@@ -271,6 +343,12 @@ public class MachineCache {
         cached.info.threads.clear();
     }
 
+    /**
+     * 判断缓存机器所在区块当前是否已加载。
+     * @param server 当前服务器实例
+     * @param key 目标机器键
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private static boolean isCachedPositionLoaded(MinecraftServer server, MachineKey key) {
         WorldServer world = server.getWorld(key.dimension);
         if (world == null) {
@@ -281,6 +359,11 @@ public class MachineCache {
         return world.getChunkProvider().getLoadedChunk(chunkX, chunkZ) != null;
     }
 
+    /**
+     * 刷新单个机器键对应的缓存数据。
+     * @param server 当前服务器实例
+     * @param key 目标机器键
+     */
     private static void refreshKey(MinecraftServer server, MachineKey key) {
         if (server == null || key == null) {
             return;
@@ -304,12 +387,22 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 立即并延迟扫描指定位置的机器控制器。
+     * @param world 目标世界
+     * @param pos 目标方块位置
+     */
     private static void scheduleTrackPosition(WorldServer world, BlockPos pos) {
         discoveryDirty = true;
         trackPosition(world, pos);
         world.addScheduledTask(() -> trackPosition(world, pos));
     }
 
+    /**
+     * 扫描指定世界位置上的方块实体。
+     * @param world 目标世界
+     * @param pos 目标方块位置
+     */
     private static void trackPosition(WorldServer world, BlockPos pos) {
         if (world == null || pos == null) {
             return;
@@ -317,6 +410,12 @@ public class MachineCache {
         trackTile(world.getTileEntity(pos), null);
     }
 
+    /**
+     * 校验指定区块中的持久化机器是否仍然存在。
+     * @param world 目标世界
+     * @param chunkX 区块 X 坐标
+     * @param chunkZ 区块 Z 坐标
+     */
     private static void validatePersistedInChunk(WorldServer world, int chunkX, int chunkZ) {
         MinecraftServer server = world.getMinecraftServer();
         loadPersistedIfNeeded(server);
@@ -338,6 +437,10 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 按需把世界保存数据中的机器记录加载到内存缓存。
+     * @param server 当前服务器实例
+     */
     private static void loadPersistedIfNeeded(MinecraftServer server) {
         if (server == null) {
             return;
@@ -368,10 +471,19 @@ public class MachineCache {
         persistedLoaded = true;
     }
 
+    /**
+     * 获取服务器上的终端机器保存数据。
+     * @param server 当前服务器实例
+     * @return 方法执行结果
+     */
     private static TerminalMachineSavedData savedData(MinecraftServer server) {
         return TerminalMachineSavedData.get(server);
     }
 
+    /**
+     * 从内存缓存和世界保存数据中删除指定机器。
+     * @param key 目标机器键
+     */
     private static void removeMachine(MachineKey key) {
         if (key == null) {
             return;
@@ -383,6 +495,12 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 从机器控制器捕获最新信息并更新缓存。
+     * @param controller 目标机器控制器
+     * @param loaded 机器当前是否已加载
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private static boolean update(TileMultiblockMachineController controller, boolean loaded) {
         if (controller == null || controller.getWorld() == null) {
             return false;
@@ -399,10 +517,23 @@ public class MachineCache {
         return true;
     }
 
+    /**
+     * 判断缓存机器对指定玩家是否可见。
+     * @param cached 缓存机器对象
+     * @param player 目标玩家
+     * @param includeTeamControllers 是否包含团队成员拥有的控制器
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private static boolean visibleTo(CachedMachine cached, EntityPlayerMP player, boolean includeTeamControllers) {
         return cached != null && MachineAccess.canAccess(player, cached.owner, includeTeamControllers);
     }
 
+    /**
+     * 从机器控制器采集完整机器展示信息。
+     * @param controller 目标机器控制器
+     * @param loaded 机器当前是否已加载
+     * @return 方法执行结果
+     */
     private static MachineInfo capture(TileMultiblockMachineController controller, boolean loaded) {
         MachineInfo info = new MachineInfo();
         info.key = new MachineKey(controller.getWorld().provider.getDimension(), controller.getPos());
@@ -442,6 +573,11 @@ public class MachineCache {
         return info;
     }
 
+    /**
+     * 采集机器绑定的智能接口信息。
+     * @param controller 目标机器控制器
+     * @param info 机器信息
+     */
     private static void captureSmartInterfaces(TileMultiblockMachineController controller, MachineInfo info) {
         Map<TileSmartInterface.SmartInterfaceProvider, String> smartInterfaces = controller.getFoundSmartInterfaces();
         if (smartInterfaces == null || smartInterfaces.isEmpty()) {
@@ -469,6 +605,11 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 从智能接口提供器中取出实际方块实体。
+     * @param provider 组件提供器
+     * @return 方法执行结果
+     */
     private static TileSmartInterface smartInterfaceTile(TileSmartInterface.SmartInterfaceProvider provider) {
         try {
             Field parent = provider.getClass().getDeclaredField("parent");
@@ -480,6 +621,12 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 从配方线程采集线程展示信息。
+     * @param index 目标索引
+     * @param thread 目标配方线程
+     * @return 方法执行结果
+     */
     private static ThreadInfo captureThread(int index, RecipeThread thread) {
         ThreadInfo info = new ThreadInfo();
         info.name = "Thread " + index;
@@ -505,6 +652,12 @@ public class MachineCache {
         return info;
     }
 
+    /**
+     * 计算机器可用的最大线程数。
+     * @param controller 目标机器控制器
+     * @param threads threads 参数
+     * @return 计算得到的数值
+     */
     private static int maxThreads(TileMultiblockMachineController controller, RecipeThread[] threads) {
         if (controller instanceof TileFactoryController) {
             return safeMaxThreads((TileFactoryController) controller);
@@ -512,6 +665,11 @@ public class MachineCache {
         return threads == null ? 0 : threads.length;
     }
 
+    /**
+     * 安全读取工厂控制器的最大线程数。
+     * @param controller 目标机器控制器
+     * @return 计算得到的数值
+     */
     private static int safeMaxThreads(TileFactoryController controller) {
         try {
             return Math.max(0, controller.getMaxThreads());
@@ -520,6 +678,11 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 解析机器控制器对应的显示名称。
+     * @param controller 目标机器控制器
+     * @return 对应的文本
+     */
     private static String machineName(TileMultiblockMachineController controller) {
         DynamicMachine machine = controller.getFoundMachine();
         if (machine == null && controller instanceof TileMachineController) {
@@ -538,6 +701,11 @@ public class MachineCache {
         return formedName == null || formedName.isEmpty() ? "Unknown Machine" : formedName;
     }
 
+    /**
+     * 解析机器控制器在终端中显示的图标。
+     * @param controller 目标机器控制器
+     * @return 方法执行结果
+     */
     private static ItemStack controllerIcon(TileMultiblockMachineController controller) {
         Block block = controller.getWorld().getBlockState(controller.getPos()).getBlock();
         Item item = Item.getItemFromBlock(block);
@@ -554,6 +722,11 @@ public class MachineCache {
         return ItemStack.EMPTY;
     }
 
+    /**
+     * 把机器状态对象转换为本地化键或文本。
+     * @param status 机器或线程状态
+     * @return 对应的文本
+     */
     private static String statusText(CraftingStatus status) {
         if (status == null) {
             return "";
@@ -562,6 +735,11 @@ public class MachineCache {
         return text == null ? "" : text;
     }
 
+    /**
+     * 安全读取机器控制器的最大并行数。
+     * @param controller 目标机器控制器
+     * @return 计算得到的数值
+     */
     private static int safeMaxParallelism(TileMultiblockMachineController controller) {
         try {
             return Math.max(0, controller.getMaxParallelism());
@@ -570,6 +748,11 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 计算当前配方的百分比进度。
+     * @param activeRecipe 当前活动配方
+     * @return 计算得到的数值
+     */
     private static int recipeProgress(ActiveMachineRecipe activeRecipe) {
         int totalTick = activeRecipe.getTotalTick();
         if (totalTick <= 0) {
@@ -579,6 +762,11 @@ public class MachineCache {
         return Math.max(0, Math.min(100, tick * 100 / totalTick));
     }
 
+    /**
+     * 计算配方线程每 tick 的净能量流。
+     * @param thread 目标配方线程
+     * @return 计算得到的数值
+     */
     private static long energyFlowPerTick(RecipeThread thread) {
         if (thread == null || thread.getActiveRecipe() == null) {
             return 0;
@@ -590,6 +778,12 @@ public class MachineCache {
         return energyPerTick(context, IOType.OUTPUT) - energyPerTick(context, IOType.INPUT);
     }
 
+    /**
+     * 计算指定能量需求或方向的每 tick 能量值。
+     * @param context 配方执行上下文
+     * @param ioType 输入输出方向
+     * @return 计算得到的数值
+     */
     private static long energyPerTick(RecipeCraftingContext context, IOType ioType) {
         long total = 0;
         List<ComponentRequirement<?, ?>> requirements = context.getRequirementBy(RequirementTypesMM.REQUIREMENT_ENERGY, ioType);
@@ -601,6 +795,12 @@ public class MachineCache {
         return total;
     }
 
+    /**
+     * 计算指定能量需求或方向的每 tick 能量值。
+     * @param context 配方执行上下文
+     * @param energy 能量需求对象
+     * @return 计算得到的数值
+     */
     private static long energyPerTick(RecipeCraftingContext context, RequirementEnergy energy) {
         long perTick = energy.getRequiredEnergyPerTick();
         return Math.round(RecipeModifier.applyModifiers(context, energy, (double) perTick, false)
@@ -608,6 +808,11 @@ public class MachineCache {
                 * energy.getParallelism());
     }
 
+    /**
+     * 查找当前配方的第一个可展示输出。
+     * @param activeRecipe 当前活动配方
+     * @return 方法执行结果
+     */
     private static OutputInfo firstOutput(ActiveMachineRecipe activeRecipe) {
         if (activeRecipe == null || activeRecipe.getRecipe() == null) {
             return OutputInfo.none();
@@ -624,6 +829,11 @@ public class MachineCache {
         return OutputInfo.none();
     }
 
+    /**
+     * 把配方输出需求转换为终端输出信息。
+     * @param requirement 配方需求对象
+     * @return 方法执行结果
+     */
     private static OutputInfo outputFromRequirement(ComponentRequirement<?, ?> requirement) {
         if (requirement instanceof RequirementItem) {
             RequirementItem item = (RequirementItem) requirement;
@@ -647,6 +857,12 @@ public class MachineCache {
         return OutputInfo.text(OutputInfo.Type.TEXT, requirement.getRequirementType().getClass().getSimpleName());
     }
 
+    /**
+     * 通过反射读取对象上的公开字段值。
+     * @param target 反射目标对象
+     * @param name 目标名称
+     * @return 方法执行结果
+     */
     private static Object fieldValue(Object target, String name) {
         try {
             Field field = target.getClass().getField(name);
@@ -656,6 +872,11 @@ public class MachineCache {
         }
     }
 
+    /**
+     * 通过反射解析气体堆的显示名称。
+     * @param gasStack 气体堆对象
+     * @return 对应的文本
+     */
     private static String gasName(Object gasStack) {
         if (gasStack == null) {
             return "";
