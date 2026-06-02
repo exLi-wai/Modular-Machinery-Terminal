@@ -7,7 +7,6 @@ import com.shiver.modularmachineryterminal.network.RemoteContainerTracker;
 import com.shiver.modularmachineryterminal.network.TerminalNetwork;
 import com.shiver.modularmachineryterminal.server.MachineCache;
 import com.shiver.modularmachineryterminal.server.command.CommandMachineStatus;
-import com.shiver.modularmachineryterminal.server.command.CommandTeleportMachine;
 import com.shiver.modularmachineryterminal.modularmachinery_terminal.Tags;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
@@ -62,7 +61,6 @@ public class ModularMachineryTerminal {
 
     @Mod.EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
-        event.registerServerCommand(new CommandTeleportMachine());
         event.registerServerCommand(new CommandMachineStatus());
     }
 }
