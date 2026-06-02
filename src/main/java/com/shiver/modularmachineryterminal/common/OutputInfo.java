@@ -20,10 +20,19 @@ public class OutputInfo {
     public FluidStack fluid;
     public String name = "";
 
+    /**
+     * 创建一个表示无输出的输出信息。
+     * @return 方法执行结果
+     */
     public static OutputInfo none() {
         return new OutputInfo();
     }
 
+    /**
+     * 创建一个物品输出信息。
+     * @param stack 物品堆
+     * @return 方法执行结果
+     */
     public static OutputInfo item(ItemStack stack) {
         OutputInfo info = new OutputInfo();
         info.type = Type.ITEM;
@@ -32,6 +41,11 @@ public class OutputInfo {
         return info;
     }
 
+    /**
+     * 创建一个流体输出信息。
+     * @param stack 物品堆
+     * @return 方法执行结果
+     */
     public static OutputInfo fluid(FluidStack stack) {
         OutputInfo info = new OutputInfo();
         info.type = Type.FLUID;
@@ -40,6 +54,12 @@ public class OutputInfo {
         return info;
     }
 
+    /**
+     * 创建一个文本形式的输出信息。
+     * @param type 待检查的类型
+     * @param name 目标名称
+     * @return 方法执行结果
+     */
     public static OutputInfo text(Type type, String name) {
         OutputInfo info = new OutputInfo();
         info.type = type;
@@ -47,6 +67,10 @@ public class OutputInfo {
         return info;
     }
 
+    /**
+     * 将当前对象的数据写入目标缓冲区。
+     * @param buffer 网络数据缓冲区
+     */
     public void write(PacketBuffer buffer) {
         buffer.writeByte(type.ordinal());
         buffer.writeString(name);
@@ -59,6 +83,11 @@ public class OutputInfo {
         }
     }
 
+    /**
+     * 从目标缓冲区读取并创建对象。
+     * @param buffer 网络数据缓冲区
+     * @return 方法执行结果
+     */
     public static OutputInfo read(PacketBuffer buffer) {
         OutputInfo info = new OutputInfo();
         info.type = Type.values()[buffer.readUnsignedByte()];
@@ -78,6 +107,10 @@ public class OutputInfo {
         return info;
     }
 
+    /**
+     * 返回输出内容的显示名称。
+     * @return 对应的文本
+     */
     public String displayName() {
         if (type == Type.ITEM && !item.isEmpty()) {
             return item.getDisplayName();

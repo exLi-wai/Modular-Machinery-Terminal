@@ -15,6 +15,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.network.play.server.SPacketBlockChange;
 import net.minecraft.network.play.server.SPacketChunkData;
 import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
@@ -42,13 +43,29 @@ public class PacketOpenMachineComponentGui implements IMessage {
     private int index;
     private boolean prepared;
 
+    /**
+     * 创建 PacketOpenMachineComponentGui 实例。
+     */
     public PacketOpenMachineComponentGui() {
     }
 
+    /**
+     * 创建 PacketOpenMachineComponentGui 实例。
+     * @param key 目标机器键
+     * @param group 组件 GUI 分组
+     * @param index 目标索引
+     */
     public PacketOpenMachineComponentGui(MachineKey key, ComponentGuiGroup group, int index) {
         this(key, group, index, false);
     }
 
+    /**
+     * 创建 PacketOpenMachineComponentGui 实例。
+     * @param key 目标机器键
+     * @param group 组件 GUI 分组
+     * @param index 目标索引
+     * @param prepared 客户端是否已经完成预同步
+     */
     public PacketOpenMachineComponentGui(MachineKey key, ComponentGuiGroup group, int index, boolean prepared) {
         this.key = key;
         this.group = group;
@@ -56,6 +73,10 @@ public class PacketOpenMachineComponentGui implements IMessage {
         this.prepared = prepared;
     }
 
+    /**
+     * 从网络缓冲区读取该消息的数据。
+     * @param buf 网络字节缓冲区
+     */
     @Override
     public void fromBytes(ByteBuf buf) {
         PacketBuffer buffer = new PacketBuffer(buf);
@@ -65,6 +86,10 @@ public class PacketOpenMachineComponentGui implements IMessage {
         prepared = buffer.readBoolean();
     }
 
+    /**
+     * 将该消息的数据写入网络缓冲区。
+     * @param buf 网络字节缓冲区
+     */
     @Override
     public void toBytes(ByteBuf buf) {
         PacketBuffer buffer = new PacketBuffer(buf);
@@ -76,6 +101,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
 
     public static class Handler implements IMessageHandler<PacketOpenMachineComponentGui, IMessage> {
 
+        /**
+         * 处理收到的网络消息，并把实际逻辑切换到对应线程执行。
+         * @param message 收到的网络消息
+         * @param ctx 网络消息上下文
+         * @return 需要回复的网络消息，通常为 null
+         */
         @Override
         public IMessage onMessage(PacketOpenMachineComponentGui message, MessageContext ctx) {
             EntityPlayerMP player = ctx.getServerHandler().player;
@@ -83,6 +114,11 @@ public class PacketOpenMachineComponentGui implements IMessage {
             return null;
         }
 
+        /**
+         * 校验机器和目标组件后打开对应远程 GUI。
+         * @param player 目标玩家
+         * @param message 收到的网络消息
+         */
         private static void open(EntityPlayerMP player, PacketOpenMachineComponentGui message) {
             if (message.key == null) {
                 return;
@@ -110,16 +146,15 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
             int index = wrap(message.index, targets.size());
             TargetGui target = targets.get(index);
-            // Sync the target block and tile entity to the client so that
-            // Forge's client-side GUI handler can find the TileEntity.
-            syncTargetToClient(player, world, target.pos);
             if (!message.prepared) {
+
+                RemoteContainerTracker.SyncContext syncContext = syncTargetToClient(player, world, target.pos);
+                RemoteContainerTracker.prepare(player, message.key, syncContext);
                 TerminalNetwork.CHANNEL.sendTo(new PacketPrepareComponentGui(message.key, message.group, index, targets.size(), target.pos), player);
                 return;
             }
             TerminalNetwork.CHANNEL.sendTo(new PacketComponentGuiPager(message.key, message.group, index, targets.size(), target.pos), player);
-            // Temporarily move the player to the target block so that
-            // Container.canInteractWith distance checks pass for remote GUIs.
+
             double origX = player.posX;
             double origY = player.posY;
             double origZ = player.posZ;
@@ -133,33 +168,31 @@ public class PacketOpenMachineComponentGui implements IMessage {
                 player.posY = origY;
                 player.posZ = origZ;
             }
-            // Track this player for tick-based coordinate spoofing so that
-            // canInteractWith distance checks pass on subsequent ticks.
-            // Unlike the old RemoteContainerWrapper approach, this preserves
-            // the original container class so that instanceof checks in
-            // MMCE/AE2 packet handlers (e.g. PktMEInputBusInvAction,
-            // PacketInventoryAction) still work correctly.
-            RemoteContainerTracker.track(player, target.pos);
+
+            
+
+            
+            RemoteContainerTracker.track(player, message.key, target.pos);
         }
 
-        private static void syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {
-            if (player.dimension == world.provider.getDimension()) {
-                // Same dimension: send full chunk data.
-                Chunk chunk = world.getChunk(pos);
-                player.connection.sendPacket(new SPacketChunkData(chunk, 65535));
+        /**
+         * 把远程目标方块和方块实体同步到客户端。
+         * @param player 目标玩家
+         * @param world 目标世界
+         * @param pos 目标方块位置
+         * @return 方法执行结果
+         */
+        private static RemoteContainerTracker.SyncContext syncTargetToClient(EntityPlayerMP player, WorldServer world, BlockPos pos) {
+            WorldServer playerWorld = player.getServerWorld();
+            int chunkX = pos.getX() >> 4;
+            int chunkZ = pos.getZ() >> 4;
+            boolean watching = playerWorld.getPlayerChunkMap().isPlayerWatchingChunk(player, chunkX, chunkZ);
+            boolean fakeChunkSent = false;
+
+            if (player.dimension == world.provider.getDimension() && watching) {
+                player.connection.sendPacket(new SPacketBlockChange(world, pos));
             } else {
-                // Cross-dimension: we cannot send the real chunk because
-                // SPacketChunkData encodes sky light based on the source
-                // world's hasSkyLight(), while the client decodes based on
-                // its own world's hasSkyLight(). A mismatch corrupts the
-                // entire buffer. SPacketBlockChange also fails because the
-                // client may not have the target chunk loaded at all.
-                //
-                // Solution: build a minimal fake chunk belonging to the
-                // PLAYER's world (so sky light matches) that contains only
-                // the target block and its tile entity data.
-                WorldServer playerWorld = player.getServerWorld();
-                Chunk fakeChunk = new Chunk(playerWorld, pos.getX() >> 4, pos.getZ() >> 4);
+                Chunk fakeChunk = new Chunk(playerWorld, chunkX, chunkZ);
                 IBlockState targetState = world.getBlockState(pos);
                 int sectionIndex = pos.getY() >> 4;
                 ExtendedBlockStorage[] storage = fakeChunk.getBlockStorageArray();
@@ -167,13 +200,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
                         sectionIndex << 4, playerWorld.provider.hasSkyLight());
                 storage[sectionIndex].set(
                         pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15, targetState);
-                // Include the TE in the chunk so handleChunkData creates it
-                // on the client and populates its data via handleUpdateTag.
                 TileEntity targetTe = world.getTileEntity(pos);
                 if (targetTe != null) {
                     fakeChunk.getTileEntityMap().put(pos, targetTe);
                 }
                 player.connection.sendPacket(new SPacketChunkData(fakeChunk, 65535));
+                fakeChunkSent = true;
             }
             TileEntity tile = world.getTileEntity(pos);
             if (tile != null) {
@@ -184,8 +216,15 @@ public class PacketOpenMachineComponentGui implements IMessage {
                     player.connection.sendPacket(new SPacketUpdateTileEntity(pos, 0, tile.getUpdateTag()));
                 }
             }
+            return new RemoteContainerTracker.SyncContext(player.dimension, chunkX, chunkZ, fakeChunkSent);
         }
 
+        /**
+         * 收集指定机器中属于目标分组的可打开 GUI。
+         * @param controller 目标机器控制器
+         * @param group 组件 GUI 分组
+         * @return 符合条件的列表
+         */
         private static List<TargetGui> targets(TileMultiblockMachineController controller, ComponentGuiGroup group) {
             Map<BlockPos, TargetGui> targets = new LinkedHashMap<>();
             addTarget(targets, controller, group);
@@ -213,6 +252,32 @@ public class PacketOpenMachineComponentGui implements IMessage {
             return list;
         }
 
+        /**
+         * 判断机器是否包含指定位置的可打开组件 GUI。
+         * @param controller 目标机器控制器
+         * @param pos 目标方块位置
+         * @return 条件成立时返回 true，否则返回 false
+         */
+        static boolean hasTarget(TileMultiblockMachineController controller, BlockPos pos) {
+            if (controller == null || pos == null) {
+                return false;
+            }
+            for (ComponentGuiGroup group : ComponentGuiGroup.values()) {
+                for (TargetGui target : targets(controller, group)) {
+                    if (pos.equals(target.pos)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * 把可打开 GUI 的方块实体加入目标集合。
+         * @param targets 目标 GUI 集合
+         * @param tile 目标方块实体
+         * @param group 组件 GUI 分组
+         */
         private static void addTarget(Map<BlockPos, TargetGui> targets, TileEntity tile, ComponentGuiGroup group) {
             int guiId = guiId(tile, group);
             if (tile != null && guiId >= 0) {
@@ -220,6 +285,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
         }
 
+        /**
+         * 解析组件方块实体或枚举名称对应的 Modular Machinery GUI 编号。
+         * @param tile 目标方块实体
+         * @param group 组件 GUI 分组
+         * @return 计算得到的数值
+         */
         private static int guiId(TileEntity tile, ComponentGuiGroup group) {
             if (group == ComponentGuiGroup.CONTROLLER) {
                 if (isType(tile, "hellfirepvp.modularmachinery.common.tiles.TileFactoryController")) return guiId("FACTORY");
@@ -246,6 +317,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
             return -1;
         }
 
+        /**
+         * 判断对象或类型是否匹配指定类名或接口名。
+         * @param object 待检查对象
+         * @param className 待匹配的完整类名
+         * @return 条件成立时返回 true，否则返回 false
+         */
         private static boolean isType(Object object, String className) {
             if (object == null) {
                 return false;
@@ -253,6 +330,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
             return isType(object.getClass(), className);
         }
 
+        /**
+         * 判断对象或类型是否匹配指定类名或接口名。
+         * @param type 待检查的类型
+         * @param className 待匹配的完整类名
+         * @return 条件成立时返回 true，否则返回 false
+         */
         private static boolean isType(Class<?> type, String className) {
             while (type != null) {
                 if (className.equals(type.getName()) || hasInterface(type, className)) {
@@ -263,6 +346,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
             return false;
         }
 
+        /**
+         * 递归判断类型是否实现指定接口。
+         * @param type 待检查的类型
+         * @param className 待匹配的完整类名
+         * @return 条件成立时返回 true，否则返回 false
+         */
         private static boolean hasInterface(Class<?> type, String className) {
             for (Class<?> iface : type.getInterfaces()) {
                 if (className.equals(iface.getName()) || hasInterface(iface, className)) {
@@ -272,6 +361,11 @@ public class PacketOpenMachineComponentGui implements IMessage {
             return false;
         }
 
+        /**
+         * 解析组件方块实体或枚举名称对应的 Modular Machinery GUI 编号。
+         * @param name 目标名称
+         * @return 计算得到的数值
+         */
         private static int guiId(String name) {
             try {
                 Class<?> type = Class.forName("hellfirepvp.modularmachinery.common.CommonProxy$GuiType");
@@ -282,10 +376,20 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
         }
 
+        /**
+         * 返回组件 GUI 分组对应的本地化键。
+         * @param group 组件 GUI 分组
+         * @return 对应的文本
+         */
         private static String groupTranslationKey(ComponentGuiGroup group) {
             return "message.modular_machinery_terminal.gui_group." + group.name().toLowerCase();
         }
 
+        /**
+         * 从升级总线提供器中取出实际方块实体。
+         * @param provider 组件提供器
+         * @return 方法执行结果
+         */
         private static TileUpgradeBus upgradeBusTile(TileUpgradeBus.UpgradeBusProvider provider) {
             try {
                 Field parent = provider.getClass().getDeclaredField("parent");
@@ -297,6 +401,11 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
         }
 
+        /**
+         * 从智能接口提供器中取出实际方块实体。
+         * @param provider 组件提供器
+         * @return 方法执行结果
+         */
         private static TileSmartInterface smartInterfaceTile(TileSmartInterface.SmartInterfaceProvider provider) {
             try {
                 Field parent = provider.getClass().getDeclaredField("parent");
@@ -308,6 +417,12 @@ public class PacketOpenMachineComponentGui implements IMessage {
             }
         }
 
+        /**
+         * 把索引环绕到指定列表大小范围内。
+         * @param index 目标索引
+         * @param size 列表大小
+         * @return 计算得到的数值
+         */
         private static int wrap(int index, int size) {
             int result = index % size;
             return result < 0 ? result + size : result;
@@ -318,6 +433,11 @@ public class PacketOpenMachineComponentGui implements IMessage {
         private final BlockPos pos;
         private final int guiId;
 
+        /**
+         * 创建 TargetGui 实例。
+         * @param pos 目标方块位置
+         * @param guiId guiId 参数
+         */
         private TargetGui(BlockPos pos, int guiId) {
             this.pos = pos;
             this.guiId = guiId;

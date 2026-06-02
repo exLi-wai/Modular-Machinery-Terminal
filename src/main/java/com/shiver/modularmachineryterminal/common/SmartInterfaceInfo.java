@@ -11,6 +11,10 @@ public class SmartInterfaceInfo {
     public String parentMachineName = "";
     public float value;
 
+    /**
+     * 将当前对象的数据写入目标缓冲区。
+     * @param buffer 网络数据缓冲区
+     */
     public void write(PacketBuffer buffer) {
         buffer.writeBlockPos(interfacePos);
         buffer.writeInt(dataIndex);
@@ -19,6 +23,11 @@ public class SmartInterfaceInfo {
         buffer.writeFloat(value);
     }
 
+    /**
+     * 从目标缓冲区读取并创建对象。
+     * @param buffer 网络数据缓冲区
+     * @return 方法执行结果
+     */
     public static SmartInterfaceInfo read(PacketBuffer buffer) {
         SmartInterfaceInfo info = new SmartInterfaceInfo();
         info.interfacePos = buffer.readBlockPos();

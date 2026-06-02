@@ -12,6 +12,10 @@ public class ThreadInfo {
     public int progress;
     public OutputInfo output = OutputInfo.none();
 
+    /**
+     * 将当前对象的数据写入目标缓冲区。
+     * @param buffer 网络数据缓冲区
+     */
     public void write(PacketBuffer buffer) {
         buffer.writeString(name);
         buffer.writeString(status);
@@ -22,6 +26,11 @@ public class ThreadInfo {
         output.write(buffer);
     }
 
+    /**
+     * 从目标缓冲区读取并创建对象。
+     * @param buffer 网络数据缓冲区
+     * @return 方法执行结果
+     */
     public static ThreadInfo read(PacketBuffer buffer) {
         ThreadInfo info = new ThreadInfo();
         info.name = buffer.readString(32767);

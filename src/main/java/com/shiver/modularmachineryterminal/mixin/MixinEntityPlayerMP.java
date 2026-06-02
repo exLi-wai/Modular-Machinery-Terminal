@@ -8,23 +8,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-/**
- * Mixin into {@link EntityPlayerMP#onUpdate()} to bypass the
- * {@code Container.canInteractWith()} distance check for players
- * who have remotely-opened containers via the terminal.
- * <p>
- * Without this, the GUI would be closed every tick because the player
- * is too far from the target tile entity.
- */
 @Mixin(EntityPlayerMP.class)
 public abstract class MixinEntityPlayerMP {
 
-    /**
-     * Redirects the {@code this.openContainer.canInteractWith(this)} call
-     * in {@code EntityPlayerMP.onUpdate()} (line ~363). If the player is
-     * tracked by {@link RemoteContainerTracker}, returns {@code true}
-     * unconditionally to prevent the GUI from being closed.
-     */
     @Redirect(
             method = "onUpdate",
             at = @At(
@@ -32,8 +18,14 @@ public abstract class MixinEntityPlayerMP {
                     target = "Lnet/minecraft/inventory/Container;canInteractWith(Lnet/minecraft/entity/player/EntityPlayer;)Z"
             )
     )
+    /**
+     * 重定向容器交互检查以允许被追踪的远程组件容器继续使用。
+     * @param container 目标容器
+     * @param player 目标玩家
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean terminal$redirectCanInteractWith(Container container, EntityPlayer player) {
-        if (RemoteContainerTracker.isTracked(player.getUniqueID())) {
+        if (RemoteContainerTracker.isTrackedContainer(player.getUniqueID(), container)) {
             return true;
         }
         return container.canInteractWith(player);

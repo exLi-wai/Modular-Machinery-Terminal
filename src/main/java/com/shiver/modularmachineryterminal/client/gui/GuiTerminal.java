@@ -68,6 +68,9 @@ public class GuiTerminal extends GuiScreen {
     private final Set<MachineKey> pinnedMachines = new HashSet<>();
     private String currentTooltip;
 
+    /**
+     * 初始化终端界面控件并请求完整机器列表。
+     */
     @Override
     public void initGui() {
         Keyboard.enableRepeatEvents(true);
@@ -84,11 +87,17 @@ public class GuiTerminal extends GuiScreen {
         TerminalNetwork.CHANNEL.sendToServer(new PacketRequestFullList(showTeamControllers));
     }
 
+    /**
+     * 在终端界面关闭时释放键盘重复输入状态。
+     */
     @Override
     public void onGuiClosed() {
         Keyboard.enableRepeatEvents(false);
     }
 
+    /**
+     * 按固定间隔向服务端刷新完整列表和动态数据。
+     */
     @Override
     public void updateScreen() {
         searchField.updateCursorCounter();
@@ -100,6 +109,12 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 绘制终端主界面及当前鼠标悬停提示。
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     * @param partialTicks 渲染插值 tick
+     */
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         currentTooltip = null;
@@ -123,6 +138,13 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 处理终端界面的鼠标点击操作。
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     * @param mouseButton 鼠标按钮编号
+     * @throws IOException 读写输入或输出失败时抛出
+     */
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
         searchField.mouseClicked(mouseX, mouseY, mouseButton);
@@ -154,7 +176,9 @@ public class GuiTerminal extends GuiScreen {
             }
             for (int i = 2; i < 8; i++) {
                 if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, i), actionButtonSize(), actionButtonSize())) {
-                    TerminalNetwork.CHANNEL.sendToServer(new PacketOpenMachineComponentGui(machine.key, componentGroup(i), 0));
+                    if (machine.loaded) {
+                        TerminalNetwork.CHANNEL.sendToServer(new PacketOpenMachineComponentGui(machine.key, componentGroup(i), 0));
+                    }
                     return;
                 }
             }
@@ -187,6 +211,12 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 处理终端界面的键盘输入。
+     * @param typedChar 输入字符
+     * @param keyCode 按键编码
+     * @throws IOException 读写输入或输出失败时抛出
+     */
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
         if (searchField.textboxKeyTyped(typedChar, keyCode)) {
@@ -196,6 +226,10 @@ public class GuiTerminal extends GuiScreen {
         super.keyTyped(typedChar, keyCode);
     }
 
+    /**
+     * 处理终端界面的鼠标滚轮滚动。
+     * @throws IOException 读写输入或输出失败时抛出
+     */
     @Override
     public void handleMouseInput() throws IOException {
         super.handleMouseInput();
@@ -225,6 +259,11 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 绘制终端主面板背景。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     */
     private void drawPanel(int left, int top) {
         drawRect(left, top, left + GUI_WIDTH, top + GUI_HEIGHT, 0xEE1C2024);
         drawRect(left + 3, top + 3, left + GUI_WIDTH - 3, top + GUI_HEIGHT - 3, 0xFF2B3036);
@@ -233,6 +272,11 @@ public class GuiTerminal extends GuiScreen {
         drawRect(left + 6, top + 28, legendX(left) - 8, top + 30, 0xFF4A545F);
     }
 
+    /**
+     * 绘制终端标题和汇总状态。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     */
     private void drawHeader(int left, int top) {
         fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.title"), left + 8, top + 7, 0xDDEEFF);
         SummaryInfo summary = ClientTerminalData.getSummary();
@@ -243,10 +287,23 @@ public class GuiTerminal extends GuiScreen {
         drawStat(left + 184, y, "gui.modular_machinery_terminal.running", summary.running, 0xFF5FE69A);
     }
 
+    /**
+     * 绘制一项汇总统计。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param key 目标机器键
+     * @param value 待处理文本
+     * @param color 绘制颜色
+     */
     private void drawStat(int x, int y, String key, int value, int color) {
         fontRenderer.drawString(I18n.format(key) + " " + value, x, y, color);
     }
 
+    /**
+     * 绘制机器状态图例。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     */
     private void drawLegend(int left, int top) {
         int x = legendX(left) + 2;
         int y = top + 9;
@@ -256,11 +313,25 @@ public class GuiTerminal extends GuiScreen {
         drawLegendItem(x, y + 27, 0xFF777777, I18n.format("gui.modular_machinery_terminal.legend.unloaded"));
     }
 
+    /**
+     * 绘制单个状态图例项。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param color 绘制颜色
+     * @param text 显示文本
+     */
     private void drawLegendItem(int x, int y, int color, String text) {
         drawRect(x, y + 1, x + 2, y + 7, color);
         fontRenderer.drawString(text, x + 5, y, 0xFFBFC7CF);
     }
 
+    /**
+     * 绘制搜索栏旁的排序和团队控制器按钮。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     */
     private void drawControls(int left, int top, int mouseX, int mouseY) {
         drawSmallButton(sortX(left), top + 32, 64, 14, sortLabel(), inside(mouseX, mouseY, sortX(left), top + 32, 64, 14));
         drawSmallButton(directionX(left), top + 32, 30, 14, directionLabel(), inside(mouseX, mouseY, directionX(left), top + 32, 30, 14));
@@ -271,6 +342,15 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 绘制小型文字按钮。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param width 区域宽度
+     * @param height 区域高度
+     * @param text 显示文本
+     * @param hovered 鼠标是否悬停
+     */
     private void drawSmallButton(int x, int y, int width, int height, String text, boolean hovered) {
         int border = hovered ? 0xFF8DA5B8 : 0xFF5E6973;
         int fill = hovered ? 0xFF394650 : 0xFF273039;
@@ -281,25 +361,59 @@ public class GuiTerminal extends GuiScreen {
         fontRenderer.drawString(label, x + (width - textWidth) / 2 + 1, y + 3, 0xFFD8DEE5);
     }
 
+    /**
+     * 绘制选中机器的操作按钮列。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     */
     private void drawActionButtons(int left, int top, int mouseX, int mouseY) {
         MachineInfo machine = selectedMachine();
         int x = actionButtonX(left);
         for (int i = 0; i < 8; i++) {
             boolean hovered = inside(mouseX, mouseY, x, actionButtonY(top, i), actionButtonSize(), actionButtonSize());
-            drawIconButton(x, actionButtonY(top, i), actionButtonSize(), actionButtonSize(), actionButtonText(i, machine), hovered);
+            drawIconButton(x, actionButtonY(top, i), actionButtonSize(), actionButtonSize(), actionButtonText(i, machine), hovered, actionEnabled(i, machine));
         }
     }
 
-    private void drawIconButton(int x, int y, int width, int height, String text, boolean hovered) {
-        int border = hovered ? 0xFF8DA5B8 : 0xFF5E6973;
-        int fill = hovered ? 0xFF394650 : 0xFF273039;
+    /**
+     * 绘制操作图标按钮。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param width 区域宽度
+     * @param height 区域高度
+     * @param text 显示文本
+     * @param hovered 鼠标是否悬停
+     * @param enabled 按钮是否可用
+     */
+    private void drawIconButton(int x, int y, int width, int height, String text, boolean hovered, boolean enabled) {
+        int border = !enabled ? 0xFF434A50 : (hovered ? 0xFF8DA5B8 : 0xFF5E6973);
+        int fill = !enabled ? 0xFF20262B : (hovered ? 0xFF394650 : 0xFF273039);
+        int color = enabled ? 0xFFD8DEE5 : 0xFF6F7982;
         drawRect(x, y, x + width, y + height, border);
         drawRect(x + 1, y + 1, x + width - 1, y + height - 1, fill);
         int textWidth = fontRenderer.getStringWidth(text);
         if (textWidth > 0) textWidth -= 1;
-        fontRenderer.drawString(text, x + (width - textWidth) / 2, y + 2, 0xFFD8DEE5);
+        fontRenderer.drawString(text, x + (width - textWidth) / 2, y + 2, color);
     }
 
+    /**
+     * 判断指定操作按钮是否可用。
+     * @param index 目标索引
+     * @param machine 目标机器信息
+     * @return 条件成立时返回 true，否则返回 false
+     */
+    private boolean actionEnabled(int index, MachineInfo machine) {
+        return index < 2 || machine == null || machine.loaded;
+    }
+
+    /**
+     * 返回指定操作按钮的显示文本。
+     * @param index 目标索引
+     * @param machine 目标机器信息
+     * @return 对应的文本
+     */
     private String actionButtonText(int index, MachineInfo machine) {
         if (index == 0) return "↑";
         if (index == 1) return "T";
@@ -312,6 +426,13 @@ public class GuiTerminal extends GuiScreen {
         return "";
     }
 
+    /**
+     * 根据鼠标位置绘制操作按钮提示。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     */
     private void drawActionTooltip(int left, int top, int mouseX, int mouseY) {
         for (int i = 0; i < 8; i++) {
             if (inside(mouseX, mouseY, actionButtonX(left), actionButtonY(top, i), actionButtonSize(), actionButtonSize())) {
@@ -321,7 +442,16 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 返回指定操作按钮的提示文本。
+     * @param index 目标索引
+     * @return 对应的文本
+     */
     private String actionTooltip(int index) {
+        MachineInfo machine = selectedMachine();
+        if (index >= 2 && machine != null && !machine.loaded) {
+            return I18n.format("gui.modular_machinery_terminal.machine_unloaded");
+        }
         if (index == 1) {
             if (!TerminalConfig.clientTeleportEnabled) {
                 return I18n.format("gui.modular_machinery_terminal.teleport_disabled");
@@ -334,6 +464,11 @@ public class GuiTerminal extends GuiScreen {
         return I18n.format(actionTooltipKey(index));
     }
 
+    /**
+     * 返回指定操作按钮提示的本地化键。
+     * @param index 目标索引
+     * @return 对应的文本
+     */
     private String actionTooltipKey(int index) {
         if (index == 0) return "gui.modular_machinery_terminal.pin_current";
         if (index == 1) return "gui.modular_machinery_terminal.teleport_front";
@@ -346,6 +481,11 @@ public class GuiTerminal extends GuiScreen {
         return "";
     }
 
+    /**
+     * 把操作按钮索引转换为组件 GUI 分组。
+     * @param index 目标索引
+     * @return 方法执行结果
+     */
     private ComponentGuiGroup componentGroup(int index) {
         if (index == 2) return ComponentGuiGroup.CONTROLLER;
         if (index == 4) return ComponentGuiGroup.OUTPUT;
@@ -355,10 +495,18 @@ public class GuiTerminal extends GuiScreen {
         return ComponentGuiGroup.INPUT;
     }
 
+    /**
+     * 判断当前客户端是否允许切换团队控制器显示。
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean canToggleTeamControllers() {
         return TerminalConfig.clientTeamAccessEnabled && FTBUtilitiesCompat.isLoaded();
     }
 
+    /**
+     * 判断当前玩家是否满足传送条件。
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean canTeleport() {
         if (!TerminalConfig.clientTeleportEnabled) {
             return false;
@@ -367,6 +515,10 @@ public class GuiTerminal extends GuiScreen {
         return stage == null || stage.isEmpty() || GameStagesCompat.hasStage(mc.player, stage);
     }
 
+    /**
+     * 返回团队控制器切换按钮的提示文本。
+     * @return 对应的文本
+     */
     private String teamControllersTooltip() {
         if (!TerminalConfig.clientTeamAccessEnabled) {
             return I18n.format("gui.modular_machinery_terminal.team_controllers_disabled");
@@ -382,6 +534,13 @@ public class GuiTerminal extends GuiScreen {
                 I18n.format(showTeamControllers ? "gui.modular_machinery_terminal.state_on" : "gui.modular_machinery_terminal.state_off"));
     }
 
+    /**
+     * 绘制机器列表区域。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     */
     private void drawMachineList(int left, int top, int mouseX, int mouseY) {
         List<MachineInfo> visible = visibleMachines();
         int maxScroll = Math.max(0, visible.size() - visibleRowCount());
@@ -409,6 +568,13 @@ public class GuiTerminal extends GuiScreen {
         drawScrollbar(left + LIST_WIDTH + 8, listY, 3, visibleRowCount() * ROW_HEIGHT - 2, visible.size(), visibleRowCount(), scroll);
     }
 
+    /**
+     * 绘制选中机器的详细信息。
+     * @param left 界面左侧坐标
+     * @param top 界面顶部坐标
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     */
     private void drawDetails(int left, int top, int mouseX, int mouseY) {
         MachineInfo machine = selectedMachine();
         int x = left + LIST_WIDTH + 20;
@@ -444,6 +610,14 @@ public class GuiTerminal extends GuiScreen {
         drawThreads(x, y + 1, machine, mouseX, mouseY);
     }
 
+    /**
+     * 绘制选中机器的线程信息。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param machine 目标机器信息
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     */
     private void drawThreads(int x, int y, MachineInfo machine, int mouseX, int mouseY) {
         if (machine.threads.isEmpty()) {
             fontRenderer.drawString(I18n.format("gui.modular_machinery_terminal.thread_outputs") + ": 0", x, y, 0xFF888888);
@@ -484,10 +658,25 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 计算线程列表当前可显示的行数。
+     * @param y 绘制或检测区域的 Y 坐标
+     * @return 计算得到的数值
+     */
     private int visibleThreadRows(int y) {
         return Math.max(0, (guiTop() + GUI_HEIGHT - 8 - y) / ROW_HEIGHT);
     }
 
+    /**
+     * 绘制滚动条。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param width 区域宽度
+     * @param height 区域高度
+     * @param total 总数量
+     * @param visible 可见数量
+     * @param offset 滚动偏移
+     */
     private void drawScrollbar(int x, int y, int width, int height, int total, int visible, int offset) {
         if (total <= visible || visible <= 0 || height <= 0) {
             drawRect(x, y, x + width, y + height, 0xFF20262B);
@@ -501,6 +690,12 @@ public class GuiTerminal extends GuiScreen {
         drawRect(x, thumbY, x + width, thumbY + thumbHeight, 0xFF6F7982);
     }
 
+    /**
+     * 绘制机器状态灯。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param machine 目标机器信息
+     */
     private void drawStatusLamp(int x, int y, MachineInfo machine) {
         int color = 0xFF777777;
         if (machine.loaded && machine.running) {
@@ -514,12 +709,25 @@ public class GuiTerminal extends GuiScreen {
         drawRect(x + 2, y, x + 3, y + 14, 0x66000000);
     }
 
+    /**
+     * 绘制线程状态灯。
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param thread 目标配方线程
+     */
     private void drawThreadStatusLamp(int x, int y, ThreadInfo thread) {
         int color = thread.working ? 0xFF43E06D : 0xFFE2C84A;
         drawRect(x, y, x + 2, y + 14, color);
         drawRect(x + 2, y, x + 3, y + 14, 0x66000000);
     }
 
+    /**
+     * 绘制物品图标。
+     * @param stack 物品堆
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param grey 是否使用灰色绘制
+     */
     private void drawItem(ItemStack stack, int x, int y, boolean grey) {
         if (stack == null || stack.isEmpty()) {
             drawRect(x, y, x + 16, y + 16, grey ? 0xFF555555 : 0xFF39424B);
@@ -532,6 +740,12 @@ public class GuiTerminal extends GuiScreen {
         RenderHelper.disableStandardItemLighting();
     }
 
+    /**
+     * 绘制线程输出图标。
+     * @param output 输出信息
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     */
     private void drawOutputIcon(OutputInfo output, int x, int y) {
         if (output == null || output.type == OutputInfo.Type.NONE) {
             drawRect(x, y, x + 16, y + 16, 0xFF39424B);
@@ -552,6 +766,12 @@ public class GuiTerminal extends GuiScreen {
         drawRect(x, y, x + 16, y + 16, 0xFF39424B);
     }
 
+    /**
+     * 绘制流体图标。
+     * @param fluid 流体堆
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     */
     private void drawFluid(FluidStack fluid, int x, int y) {
         if (fluid.getFluid() == null || fluid.getFluid().getStill(fluid) == null) {
             drawRect(x, y, x + 16, y + 16, 0xFF4080C0);
@@ -564,12 +784,22 @@ public class GuiTerminal extends GuiScreen {
         drawTexturedModalRect(x, y, sprite, 16, 16);
     }
 
+    /**
+     * 返回机器成型和运行状态文本。
+     * @param machine 目标机器信息
+     * @return 对应的文本
+     */
     private String stateText(MachineInfo machine) {
         String formed = I18n.format("gui.modular_machinery_terminal.formed") + ": " + (machine.formed ? "Y" : "N");
         String running = I18n.format("gui.modular_machinery_terminal.running") + ": " + (machine.running ? "Y" : "N");
         return formed + "  " + running;
     }
 
+    /**
+     * 返回机器状态对应的颜色。
+     * @param machine 目标机器信息
+     * @return 计算得到的数值
+     */
     private int stateColor(MachineInfo machine) {
         if (machine.running) {
             return 0xFF5FE69A;
@@ -580,6 +810,10 @@ public class GuiTerminal extends GuiScreen {
         return 0xFFE05C43;
     }
 
+    /**
+     * 计算当前搜索和排序条件下可见的机器列表。
+     * @return 符合条件的列表
+     */
     private List<MachineInfo> visibleMachines() {
         String query = searchField == null ? "" : searchField.getText().toLowerCase(Locale.ROOT).trim();
         List<MachineInfo> machines = new ArrayList<>();
@@ -599,6 +833,12 @@ public class GuiTerminal extends GuiScreen {
         return machines;
     }
 
+    /**
+     * 判断机器名称是否匹配搜索条件。
+     * @param machine 目标机器信息
+     * @param query 搜索关键字
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean matchesSearch(MachineInfo machine, String query) {
         if (query.isEmpty()) {
             return true;
@@ -613,6 +853,10 @@ public class GuiTerminal extends GuiScreen {
         return true;
     }
 
+    /**
+     * 查找 JE Characters 的字符串匹配方法。
+     * @return 方法执行结果
+     */
     private static Method findJecContains() {
         try {
             return Class.forName("me.towdium.jecharacters.util.Match")
@@ -622,6 +866,12 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 使用 JE Characters 执行兼容的包含匹配。
+     * @param text 显示文本
+     * @param query 搜索关键字
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private static boolean jecContains(String text, String query) {
         if (JEC_CONTAINS == null) {
             return false;
@@ -633,6 +883,10 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 返回当前选中的机器信息。
+     * @return 方法执行结果
+     */
     private MachineInfo selectedMachine() {
         if (selected == null) {
             List<MachineInfo> machines = visibleMachines();
@@ -643,6 +897,10 @@ public class GuiTerminal extends GuiScreen {
         return selected == null ? null : ClientTerminalData.getMachine(selected);
     }
 
+    /**
+     * 收集需要动态刷新的机器键。
+     * @return 符合条件的列表
+     */
     private List<MachineKey> dynamicKeys() {
         List<MachineKey> keys = new ArrayList<>();
         MachineInfo selectedMachine = selectedMachine();
@@ -660,6 +918,11 @@ public class GuiTerminal extends GuiScreen {
         return keys;
     }
 
+    /**
+     * 把状态键转换为本地化文本。
+     * @param status 机器或线程状态
+     * @return 对应的文本
+     */
     private String localizeStatus(String status) {
         if (status == null || status.isEmpty()) {
             return I18n.format("gui.modular_machinery_terminal.idle");
@@ -670,6 +933,12 @@ public class GuiTerminal extends GuiScreen {
         return status;
     }
 
+    /**
+     * 按像素宽度裁剪显示文本。
+     * @param value 待处理文本
+     * @param width 区域宽度
+     * @return 对应的文本
+     */
     private String trim(String value, int width) {
         if (value == null) {
             return "";
@@ -677,6 +946,11 @@ public class GuiTerminal extends GuiScreen {
         return fontRenderer.trimStringToWidth(value, width);
     }
 
+    /**
+     * 格式化每 tick 能量变化文本。
+     * @param energyPerTick energyPerTick 参数
+     * @return 对应的文本
+     */
     private String formatEnergy(long energyPerTick) {
         if (energyPerTick > 0) {
             return "+" + energyPerTick + " RF/t";
@@ -687,14 +961,26 @@ public class GuiTerminal extends GuiScreen {
         return "0 RF/t";
     }
 
+    /**
+     * 返回当前排序模式标签。
+     * @return 对应的文本
+     */
     private String sortLabel() {
         return I18n.format("gui.modular_machinery_terminal.sort") + ":" + I18n.format(sortMode.key);
     }
 
+    /**
+     * 返回当前排序方向标签。
+     * @return 对应的文本
+     */
     private String directionLabel() {
         return I18n.format(descending ? "gui.modular_machinery_terminal.desc" : "gui.modular_machinery_terminal.asc");
     }
 
+    /**
+     * 切换指定机器的置顶状态。
+     * @param key 目标机器键
+     */
     private void togglePinned(MachineKey key) {
         if (pinnedMachines.contains(key)) {
             pinnedMachines.remove(key);
@@ -704,6 +990,9 @@ public class GuiTerminal extends GuiScreen {
         savePinnedMachines();
     }
 
+    /**
+     * 从配置目录加载置顶机器列表。
+     */
     private void loadPinnedMachines() {
         pinnedMachines.clear();
         File file = pinsFile();
@@ -722,6 +1011,9 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 把置顶机器列表保存到配置目录。
+     */
     private void savePinnedMachines() {
         File file = pinsFile();
         File parent = file.getParentFile();
@@ -738,6 +1030,11 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 从文本解析机器键。
+     * @param text 显示文本
+     * @return 方法执行结果
+     */
     private MachineKey parseKey(String text) {
         String[] parts = text.split(":");
         if (parts.length != 4) {
@@ -754,10 +1051,17 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 返回置顶机器列表文件。
+     * @return 对应的文件
+     */
     private File pinsFile() {
         return new File(Loader.instance().getConfigDir(), "modularmachinery_terminal_pins.txt");
     }
 
+    /**
+     * 加载终端界面设置。
+     */
     private void loadSettings() {
         File file = settingsFile();
         if (!file.isFile()) {
@@ -779,6 +1083,9 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 保存终端界面设置。
+     */
     private void saveSettings() {
         File file = settingsFile();
         File parent = file.getParentFile();
@@ -792,18 +1099,34 @@ public class GuiTerminal extends GuiScreen {
         }
     }
 
+    /**
+     * 返回终端界面设置文件。
+     * @return 对应的文件
+     */
     private File settingsFile() {
         return new File(Loader.instance().getConfigDir(), "modularmachinery_terminal_settings.txt");
     }
 
+    /**
+     * 计算终端界面左侧坐标。
+     * @return 计算得到的数值
+     */
     private int guiLeft() {
         return (width - GUI_LAYOUT_WIDTH) / 2;
     }
 
+    /**
+     * 计算终端界面顶部坐标。
+     * @return 计算得到的数值
+     */
     private int guiTop() {
         return (height - GUI_HEIGHT) / 2;
     }
 
+    /**
+     * 判断鼠标是否位于机器列表区域。
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean overListPanel() {
         int mouseX = Mouse.getEventX() * width / mc.displayWidth;
         int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
@@ -812,6 +1135,10 @@ public class GuiTerminal extends GuiScreen {
         return inside(mouseX, mouseY, left + 6, top + CONTENT_TOP, LIST_WIDTH + 6, GUI_HEIGHT - CONTENT_TOP - 8);
     }
 
+    /**
+     * 判断鼠标是否位于机器详情区域。
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean overDetailPanel() {
         int mouseX = Mouse.getEventX() * width / mc.displayWidth;
         int mouseY = height - Mouse.getEventY() * height / mc.displayHeight - 1;
@@ -820,46 +1147,103 @@ public class GuiTerminal extends GuiScreen {
         return inside(mouseX, mouseY, left + LIST_WIDTH + 16, top + CONTENT_TOP, GUI_LAYOUT_WIDTH - LIST_WIDTH - 24, GUI_HEIGHT - CONTENT_TOP - 8);
     }
 
+    /**
+     * 返回线程列表起始 Y 坐标。
+     * @return 计算得到的数值
+     */
     private int threadStartY() {
         return guiTop() + CONTENT_TOP + 78;
     }
 
+    /**
+     * 判断坐标是否位于矩形范围内。
+     * @param mouseX 鼠标 X 坐标
+     * @param mouseY 鼠标 Y 坐标
+     * @param x 绘制或检测区域的 X 坐标
+     * @param y 绘制或检测区域的 Y 坐标
+     * @param w 区域宽度
+     * @param h 区域高度
+     * @return 条件成立时返回 true，否则返回 false
+     */
     private boolean inside(int mouseX, int mouseY, int x, int y, int w, int h) {
         return mouseX >= x && mouseY >= y && mouseX < x + w && mouseY < y + h;
     }
 
+    /**
+     * 返回机器列表可显示的行数。
+     * @return 计算得到的数值
+     */
     private int visibleRowCount() {
         return 6;
     }
 
+    /**
+     * 返回排序按钮的 X 坐标。
+     * @param left 界面左侧坐标
+     * @return 计算得到的数值
+     */
     private int sortX(int left) {
         return left + 88;
     }
 
+    /**
+     * 返回排序方向按钮的 X 坐标。
+     * @param left 界面左侧坐标
+     * @return 计算得到的数值
+     */
     private int directionX(int left) {
         return left + 155;
     }
 
+    /**
+     * 返回团队控制器按钮的 X 坐标。
+     * @param left 界面左侧坐标
+     * @return 计算得到的数值
+     */
     private int teamControllersX(int left) {
         return left + 188;
     }
 
+    /**
+     * 返回状态图例的 X 坐标。
+     * @param left 界面左侧坐标
+     * @return 计算得到的数值
+     */
     private int legendX(int left) {
         return left + GUI_WIDTH - 40;
     }
 
+    /**
+     * 返回操作按钮列的 X 坐标。
+     * @param left 界面左侧坐标
+     * @return 计算得到的数值
+     */
     private int actionButtonX(int left) {
         return left + GUI_LAYOUT_WIDTH - 6;
     }
 
+    /**
+     * 返回指定操作按钮的 Y 坐标。
+     * @param top 界面顶部坐标
+     * @param index 目标索引
+     * @return 计算得到的数值
+     */
     private int actionButtonY(int top, int index) {
         return top + CONTENT_TOP + index * (actionButtonSize() + 4);
     }
 
+    /**
+     * 返回操作按钮尺寸。
+     * @return 计算得到的数值
+     */
     private int actionButtonSize() {
         return 13;
     }
 
+    /**
+     * 返回该界面是否会暂停游戏。
+     * @return 条件成立时返回 true，否则返回 false
+     */
     @Override
     public boolean doesGuiPauseGame() {
         return false;
@@ -874,16 +1258,29 @@ public class GuiTerminal extends GuiScreen {
         private final String key;
         private final Comparator<MachineInfo> comparator;
 
+        /**
+         * 创建 SortMode 实例。
+         * @param key 目标机器键
+         * @param comparator 排序比较器
+         */
         SortMode(String key, Comparator<MachineInfo> comparator) {
             this.key = key;
             this.comparator = comparator;
         }
 
+        /**
+         * 返回下一个排序模式。
+         * @return 方法执行结果
+         */
         private SortMode next() {
             SortMode[] values = values();
             return values[(ordinal() + 1) % values.length];
         }
 
+        /**
+         * 返回当前排序模式使用的比较器。
+         * @return 方法执行结果
+         */
         private Comparator<MachineInfo> comparator() {
             return comparator;
         }
