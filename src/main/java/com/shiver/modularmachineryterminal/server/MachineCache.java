@@ -175,6 +175,31 @@ public class MachineCache {
     }
 
     /**
+     * 返回玩家可见的已加载但未成型的机器信息列表，
+     * 用于登录提醒和 /mmt_machines 命令。
+     *
+     * @param player               目标玩家
+     * @param includeTeamControllers 是否包含团队成员拥有的控制器
+     * @return 符合条件的机器列表
+     */
+    public static List<MachineInfo> listUnformedMachines(EntityPlayerMP player, boolean includeTeamControllers) {
+        MinecraftServer server = player.getServer();
+        loadPersistedIfNeeded(server);
+        refreshLoadedMachinesIfDue(server, false);
+        List<MachineInfo> result = new ArrayList<>();
+        for (CachedMachine cached : CACHE.values()) {
+            if (!visibleTo(cached, player, includeTeamControllers)) {
+                continue;
+            }
+            if (!cached.info.loaded || cached.info.formed) {
+                continue;
+            }
+            result.add(cached.info.copyBasic());
+        }
+        return result;
+    }
+
+    /**
      * 为指定玩家创建所选机器的动态刷新网络包。
      * @param player 目标玩家
      * @param keys 需要刷新的机器键列表

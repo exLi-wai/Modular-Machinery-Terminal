@@ -61,6 +61,7 @@ message.modular_machinery_terminal.gui_group.output=output bus
 message.modular_machinery_terminal.gui_group.pattern=pattern provider
 message.modular_machinery_terminal.gui_group.upgrade=upgrade bus
 message.modular_machinery_terminal.gui_group.smart_interface=smart interface
+message.modular_machinery_terminal.machine_controller_not_found=Machine controller not found.
 
 modular_machinery_terminal.machine_prefix=[MMT] %s | Dim %s @
 modular_machinery_terminal.unformed=Unformed

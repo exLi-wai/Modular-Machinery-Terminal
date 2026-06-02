@@ -61,6 +61,8 @@ message.modular_machinery_terminal.gui_group.output=输出仓
 message.modular_machinery_terminal.gui_group.pattern=样板供应器
 message.modular_machinery_terminal.gui_group.upgrade=升级总线
 message.modular_machinery_terminal.gui_group.smart_interface=智能数据接口
+message.modular_machinery_terminal.machine_controller_not_found=未找到机械控制器。
+
 
 modular_machinery_terminal.machine_prefix=[MMT] %s | 维度 %s @
 modular_machinery_terminal.unformed=未成型
