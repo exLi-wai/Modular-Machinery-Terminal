@@ -1,5 +1,7 @@
 itemGroup.modularmachinery_terminal=Modular Machinery Terminal
 item.modularmachinery_terminal.terminal.name=Modular Machinery Terminal
+key.modularmachinery_terminal.open_terminal=Open Terminal
+key.categories.modularmachinery_terminal=Modular Machinery Terminal
 gui.modular_machinery_terminal.title=Modular Machinery Terminal
 gui.modular_machinery_terminal.search=Search
 gui.modular_machinery_terminal.sort=Sort

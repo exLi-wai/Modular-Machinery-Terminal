@@ -1,5 +1,7 @@
 itemGroup.modularmachinery_terminal=模块化机械终端
 item.modularmachinery_terminal.terminal.name=模块化机械终端
+key.modularmachinery_terminal.open_terminal=打开终端
+key.categories.modularmachinery_terminal=模块化机械终端
 gui.modular_machinery_terminal.title=模块化机械终端
 gui.modular_machinery_terminal.search=搜索
 gui.modular_machinery_terminal.sort=排序
