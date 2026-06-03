@@ -266,7 +266,7 @@ public class MachineCache {
         }
         int tick = server.getTickCounter();
         boolean due = tick - lastDiscoveryScanTick >= DISCOVERY_SCAN_INTERVAL_TICKS;
-        if (!force && !due) {
+        if (!force && !discoveryDirty && !due) {
             return;
         }
         refreshLoadedMachines(server);
