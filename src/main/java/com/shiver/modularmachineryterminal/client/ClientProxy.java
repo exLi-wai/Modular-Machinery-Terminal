@@ -22,6 +22,7 @@ public class ClientProxy extends CommonProxy {
                 new ModelResourceLocation(ModItems.TERMINAL.getRegistryName(), "inventory")
         );
         MinecraftForge.EVENT_BUS.register(new ComponentGuiPager());
+        MinecraftForge.EVENT_BUS.register(new KeyHandler());
     }
 
     /**

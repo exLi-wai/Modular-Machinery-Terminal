@@ -1,5 +1,7 @@
 package com.shiver.modularmachineryterminal.common.item;
 
+import baubles.api.BaubleType;
+import baubles.api.IBauble;
 import com.shiver.modularmachineryterminal.ModularMachineryTerminal;
 import com.shiver.modularmachineryterminal.common.registry.ModItems;
 import net.minecraft.entity.player.EntityPlayer;
@@ -9,8 +11,10 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumHand;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.common.Optional;
 
-public class ItemTerminal extends Item {
+@Optional.Interface(iface = "baubles.api.IBauble", modid = "baubles")
+public class ItemTerminal extends Item implements IBauble {
 
     /**
      * 创建 ItemTerminal 实例。
@@ -35,5 +39,16 @@ public class ItemTerminal extends Item {
             ModularMachineryTerminal.proxy.openTerminalGui();
         }
         return new ActionResult<>(EnumActionResult.SUCCESS, player.getHeldItem(hand));
+    }
+
+    /**
+     * 获取饰品类型，允许终端放入任意饰品栏。
+     * @param itemStack 物品堆
+     * @return 饰品类型
+     */
+    @Override
+    @Optional.Method(modid = "baubles")
+    public BaubleType getBaubleType(ItemStack itemStack) {
+        return BaubleType.TRINKET;
     }
 }
