@@ -1,6 +1,7 @@
 package com.shiver.modularmachineryterminal.client;
 
 import com.shiver.modularmachineryterminal.ModularMachineryTerminal;
+import com.shiver.modularmachineryterminal.common.BaublesCompat;
 import com.shiver.modularmachineryterminal.common.registry.ModItems;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.settings.KeyBinding;
@@ -50,17 +51,27 @@ public class KeyHandler {
     }
 
     /**
-     * 检查玩家背包中是否有终端物品。
+     * 检查玩家背包或饰品栏中是否有终端物品。
      * @param player 目标玩家
-     * @return 如果背包中有终端物品返回 true，否则返回 false
+     * @return 如果背包或饰品栏中有终端物品返回 true，否则返回 false
      */
     private boolean hasTerminalInInventory(EntityPlayer player) {
+        // 检查普通背包
         for (int i = 0; i < player.inventory.getSizeInventory(); i++) {
             ItemStack stack = player.inventory.getStackInSlot(i);
             if (!stack.isEmpty() && stack.getItem() == ModItems.TERMINAL) {
                 return true;
             }
         }
+
+        // 检查饰品栏（如果 Baubles 已加载）
+        if (BaublesCompat.isLoaded()) {
+            int slot = BaublesCompat.isBaubleEquipped(player, ModItems.TERMINAL);
+            if (slot >= 0) {
+                return true;
+            }
+        }
+
         return false;
     }
 }
