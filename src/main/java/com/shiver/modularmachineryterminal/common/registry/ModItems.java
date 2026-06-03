@@ -4,6 +4,7 @@ import com.shiver.modularmachineryterminal.ModularMachineryTerminal;
 import com.shiver.modularmachineryterminal.common.item.ItemTerminal;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -12,6 +13,16 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 public final class ModItems {
 
     public static ItemTerminal TERMINAL;
+
+    /**
+     * 本模组专属的创造模式标签页。
+     */
+    public static final CreativeTabs TAB = new CreativeTabs("modularmachinery_terminal") {
+        @Override
+        public ItemStack createIcon() {
+            return new ItemStack(TERMINAL);
+        }
+    };
 
     /**
      * 创建 ModItems 实例。
@@ -40,6 +51,6 @@ public final class ModItems {
      * @return 方法执行结果
      */
     public static CreativeTabs tab() {
-        return CreativeTabs.MISC;
+        return TAB;
     }
 }
